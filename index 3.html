@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vérificateur de bulletins</title>
+<meta name="description" content="Contrôle des bulletins de paie d'un dossier locataire : fichier, calculs, SIRET, cumuls.">
+<meta name="theme-color" content="#1C4D86" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E141B" media="(prefers-color-scheme: dark)">
+<link rel="manifest" id="manifest-link">
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAFaUlEQVR4Xu3dMW4bRxiGYdvwBdKkCAykNgJdIHdQl8LncOvaLn0OF+lyB18gCFynSZHGN4iDNUCJpklxZ3d2Zkff87SiJO7u/3JnSZF6+uL23ZcnEOpZ6HbDVwIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiCYAogmAaAIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCINrzvWz9pw+v93JXaOTlq/eNftNlT3t/LpDBp2cIXZdAhp9JzznoFkDPjWZ/es1DlwB6bSz71mMumgfQYyMZR+v5aB4A7EnTAFrXzZhazknTAGBvBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0Xbz4bhL/fPv56Xf+ij89OMPj2I7ehn6DJA+/BP7YJ1hA3Dg79kXyw0bANQgAKING4CLv3v2xXLDBjBx4O2DtYZ/GlQErDH0GQDWEgDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBt+DfE+ESEehLfXDT0GcDw15W4P4cNIPFgtZC2X4cNAGoQANGGDSDxgq2FtP06bACTtIO1tcT9OfzToIkHjXqGPgPAWgIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiCYAogmAaAIgmgCIJgCiCYBow78jLO1jPE55R9w6Q58B0od/Yh+sM2wADvw9+2K5YQOAGgRAtGEDcPF3z75YbtgAJg68fbDW8E+DioA1hj4DwFoCIJoAiCYAogmAaAIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiCYAog3/hhifiFBP4puLhj4DGP66EvfnsAEkHqwW0vbr8Esg9u2Xt7/NvoN/vfl99m1rEQBVlQz8qePvfXbz5Ml/f/5a9b6dM2wA0wVb2um6hSUXwmuG/iHPbj7efXmrGIYNYCKCukqHf6vBP+cQQ+0Qhg7gEAFttRz8U7VDGD4A2uk5+FuFMOzToLS1p+E/dnydsIQAuGqvw3+wJgJLIC7a++CfOxOUXiQ7A3DWSMO/ZkkkAL4z6vAvWRIJgG+MPvylEQiAaALgzmN59C85CwiArx7b8M+NQAA82uGfE4EAiCaAcKMtff5++8eiI3bp1WIBMIzD8C+N4BwBBBvp0f906JdEcO4sIAB279KwL4nglABCjfTo/5DSCE7PAgJg1+YM+JzbXCIAdqtksEtue0wAgUZY/pQO9M9vbmcfyeNlkADYnS2H30Uwu9Zy+CfOAEQTQJg9r/9bPvofrgMEwC60HH7PAlFN6eCeU/ozSp7xucYZgMVq/HFaz+F3EcxiNf44rffwC4BFavxxWunwb8USiCLXBvfa15eque4/1jSAl6/eL91+dmDucF+73bWvn9pq+C2BmK10aGsskyZbDn+XAJwFxlRjEEsjqvE7r2m6BDoQwZhKB/J44Pc4/JOnL27ffel1OD59eN3rV0db++cQpcNcqjS0JQ4fo97lDOBMMLYWA9pK1wAm03LIkmg8W0Ww1c+9pOsSiD7W/EuhUzWXQy2HfxdLIPoo/TdCLfQY/kn3JRBjqzG4NX7GUgJgtTUDvOZ7axBAqNrLoN6DPNfpdguAakojKL39FgQQrPZZYDJ3qOferqZz2ysAqrs23Ne+3pLXAaj6usCp09cJeg3/pbPdc8efLfUa+LksgdjkWmBPHrrWEQBfPTQkI7u2XQLgzrVhGc2c7REA0QTAN+Y8ao5g7nYIgO/MHZ69Krn/AuCskiHak9L77XUALrp708jNx93vpdLBP3AG4Kqlw9XKmvsnAGZZM2RbWnu/LIGYbU9LorWDfyAAivUModbgH/wPgGZgc7qoC+gAAAAASUVORK5CYII=">
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAFaUlEQVR4Xu3dMW4bRxiGYdvwBdKkCAykNgJdIHdQl8LncOvaLn0OF+lyB18gCFynSZHGN4iDNUCJpklxZ3d2Zkff87SiJO7u/3JnSZF6+uL23ZcnEOpZ6HbDVwIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiCYAogmAaAIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCINrzvWz9pw+v93JXaOTlq/eNftNlT3t/LpDBp2cIXZdAhp9JzznoFkDPjWZ/es1DlwB6bSz71mMumgfQYyMZR+v5aB4A7EnTAFrXzZhazknTAGBvBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0Xbz4bhL/fPv56Xf+ij89OMPj2I7ehn6DJA+/BP7YJ1hA3Dg79kXyw0bANQgAKING4CLv3v2xXLDBjBx4O2DtYZ/GlQErDH0GQDWEgDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBt+DfE+ESEehLfXDT0GcDw15W4P4cNIPFgtZC2X4cNAGoQANGGDSDxgq2FtP06bACTtIO1tcT9OfzToIkHjXqGPgPAWgIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiCYAogmAaAIgmgCIJgCiCYBow78jLO1jPE55R9w6Q58B0od/Yh+sM2wADvw9+2K5YQOAGgRAtGEDcPF3z75YbtgAJg68fbDW8E+DioA1hj4DwFoCIJoAiCYAogmAaAIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiCYAog3/hhifiFBP4puLhj4DGP66EvfnsAEkHqwW0vbr8Esg9u2Xt7/NvoN/vfl99m1rEQBVlQz8qePvfXbz5Ml/f/5a9b6dM2wA0wVb2um6hSUXwmuG/iHPbj7efXmrGIYNYCKCukqHf6vBP+cQQ+0Qhg7gEAFttRz8U7VDGD4A2uk5+FuFMOzToLS1p+E/dnydsIQAuGqvw3+wJgJLIC7a++CfOxOUXiQ7A3DWSMO/ZkkkAL4z6vAvWRIJgG+MPvylEQiAaALgzmN59C85CwiArx7b8M+NQAA82uGfE4EAiCaAcKMtff5++8eiI3bp1WIBMIzD8C+N4BwBBBvp0f906JdEcO4sIAB279KwL4nglABCjfTo/5DSCE7PAgJg1+YM+JzbXCIAdqtksEtue0wAgUZY/pQO9M9vbmcfyeNlkADYnS2H30Uwu9Zy+CfOAEQTQJg9r/9bPvofrgMEwC60HH7PAlFN6eCeU/ozSp7xucYZgMVq/HFaz+F3EcxiNf44rffwC4BFavxxWunwb8USiCLXBvfa15eque4/1jSAl6/eL91+dmDucF+73bWvn9pq+C2BmK10aGsskyZbDn+XAJwFxlRjEEsjqvE7r2m6BDoQwZhKB/J44Pc4/JOnL27ffel1OD59eN3rV0db++cQpcNcqjS0JQ4fo97lDOBMMLYWA9pK1wAm03LIkmg8W0Ww1c+9pOsSiD7W/EuhUzWXQy2HfxdLIPoo/TdCLfQY/kn3JRBjqzG4NX7GUgJgtTUDvOZ7axBAqNrLoN6DPNfpdguAakojKL39FgQQrPZZYDJ3qOferqZz2ysAqrs23Ne+3pLXAaj6usCp09cJeg3/pbPdc8efLfUa+LksgdjkWmBPHrrWEQBfPTQkI7u2XQLgzrVhGc2c7REA0QTAN+Y8ao5g7nYIgO/MHZ69Krn/AuCskiHak9L77XUALrp708jNx93vpdLBP3AG4Kqlw9XKmvsnAGZZM2RbWnu/LIGYbU9LorWDfyAAivUModbgH/wPgGZgc7qoC+gAAAAASUVORK5CYII=">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bulletins">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout : une colonne de contrôle — verdict du dossier en tête, puis une fiche par bulletin, puis la vérification humaine */
+:root{
+  --paper:#F3F5F8; --surface:#FFFFFF; --ink:#15202C; --muted:#5A6677; --line:#D9DFE7;
+  --accent:#1C4D86; --accent-soft:#E3ECF7;
+  --ok:#1E7A4C; --warn:#A86400; --bad:#B3261E;
+  --ok-soft:#E4F3EA; --warn-soft:#FBF0DC; --bad-soft:#FBE6E4;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0E141B; --surface:#161F29; --ink:#E5EBF2; --muted:#94A2B3; --line:#2A3644;
+  --accent:#86B4EE; --accent-soft:#1B2A3C;
+  --ok:#4CC38A; --warn:#F0B44C; --bad:#F27B70;
+  --ok-soft:#14291F; --warn-soft:#2E2412; --bad-soft:#331816; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0E141B; --surface:#161F29; --ink:#E5EBF2; --muted:#94A2B3; --line:#2A3644;
+  --accent:#86B4EE; --accent-soft:#1B2A3C;
+  --ok:#4CC38A; --warn:#F0B44C; --bad:#F27B70;
+  --ok-soft:#14291F; --warn-soft:#2E2412; --bad-soft:#331816; color-scheme:dark}
+
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5}
+.wrap{max-width:820px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:20px 48px;display:flex;flex-direction:column;gap:22px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(1.6rem,5vw,2.2rem);font-weight:800;letter-spacing:-.01em}
+h2{font-size:1.2rem;font-weight:600}
+h3{font-size:1.02rem;font-weight:600;font-family:var(--f-body);word-break:break-word}
+p{margin:0}
+.lede{color:var(--muted);max-width:62ch;margin-top:6px}
+.eyebrow{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* Dépôt */
+.drop{border:2px dashed var(--line);border-radius:var(--r);background:var(--surface);padding:22px 18px;display:flex;flex-direction:column;gap:12px;align-items:flex-start;transition:border-color .15s}
+.drop.over{border-color:var(--accent)}
+.drop p{color:var(--muted);font-size:.95rem}
+.btns{display:flex;flex-wrap:wrap;gap:10px}
+.btn{font:600 .95rem var(--f-body);border-radius:8px;padding:10px 16px;border:1px solid var(--accent);background:var(--accent);color:var(--surface);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:focus-visible,input:focus-visible,summary:focus-visible,a:focus-visible,.x:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.status{font-size:.9rem;color:var(--muted)}
+.banner{background:var(--accent-soft);border-radius:8px;padding:10px 14px;font-size:.92rem}
+.banner b{color:var(--accent)}
+
+/* Verdict du dossier */
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px 18px;display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
+.verdict .meta{min-width:0;display:flex;flex-direction:column;gap:6px}
+.stamp{font-family:var(--f-mono);font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:1rem;padding:10px 14px;border:3px double currentColor;border-radius:6px;transform:rotate(-4deg);text-align:center;line-height:1.2;white-space:nowrap}
+.stamp small{display:block;font-size:.66rem;letter-spacing:.1em;font-weight:500;opacity:.85}
+.lv-ok{color:var(--ok)} .lv-warn{color:var(--warn)} .lv-bad{color:var(--bad)} .lv-na{color:var(--muted)}
+@media (max-width:480px){.verdict{grid-template-columns:1fr}.stamp{justify-self:start}}
+
+/* Constats */
+.findings{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.f{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:10px 12px;border-radius:8px;background:var(--paper)}
+.f .t{font-weight:600}
+.f .d{color:var(--muted);font-size:.92rem}
+.f>div{min-width:0}
+.chip{font:700 .66rem var(--f-mono);letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:999px;white-space:nowrap;margin-top:2px}
+.s-crit .chip,.s-high .chip{background:var(--bad-soft);color:var(--bad)}
+.s-med .chip{background:var(--warn-soft);color:var(--warn)}
+.s-low .chip{background:var(--paper);color:var(--muted);border:1px solid var(--line)}
+.s-ok .chip{background:var(--ok-soft);color:var(--ok)}
+.s-info .chip{background:var(--accent-soft);color:var(--accent)}
+.f a{color:var(--accent);font-weight:600}
+
+/* Fiche bulletin */
+.list{display:flex;flex-direction:column;gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px}
+.card-h{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+.card-h>div:first-child{min-width:0}
+.sub{color:var(--muted);font-size:.85rem;margin-top:2px}
+.score{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.pill{font:700 .8rem var(--f-mono);padding:5px 10px;border-radius:999px;border:2px solid currentColor;white-space:nowrap}
+.x{background:none;border:0;color:var(--muted);font-size:1.3rem;line-height:1;cursor:pointer;padding:4px 6px;border-radius:6px}
+details{border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-weight:600;color:var(--accent)}
+summary span{font-weight:400;color:var(--muted);font-size:.85rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:12px}
+label{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted);font-weight:600;min-width:0}
+input[type=text],input[type=month]{font:500 .95rem var(--f-mono);padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink);width:100%;box-sizing:border-box;min-width:0}
+dl.file{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:12px 0 0;font-size:.88rem}
+dl.file dt{color:var(--muted)} dl.file dd{margin:0;min-width:0;word-break:break-word}
+
+/* Recoupements & checklist */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:12px}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:.95rem;color:var(--ink);font-weight:400}
+.check input{width:20px;height:20px;margin-top:2px;flex-shrink:0;accent-color:var(--accent)}
+.check span{min-width:0}
+.check a,.links a{color:var(--accent);font-weight:600}
+.links{display:flex;flex-direction:column;gap:6px;font-size:.95rem}
+.inline{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.inline label{flex:1 1 220px}
+.foot{color:var(--muted);font-size:.85rem;max-width:65ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<script>
+(function(){var m={"name": "Vérificateur de bulletins de paie", "short_name": "Bulletins", "description": "Contrôle des bulletins de paie d'un dossier locataire : fichier, calculs, SIRET, cumuls.", "start_url": "./index.html", "scope": "./", "display": "standalone", "orientation": "portrait", "background_color": "#F3F5F8", "theme_color": "#1C4D86", "lang": "fr", "icons": [{"src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAFaUlEQVR4Xu3dMW4bRxiGYdvwBdKkCAykNgJdIHdQl8LncOvaLn0OF+lyB18gCFynSZHGN4iDNUCJpklxZ3d2Zkff87SiJO7u/3JnSZF6+uL23ZcnEOpZ6HbDVwIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiCYAogmAaAIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCINrzvWz9pw+v93JXaOTlq/eNftNlT3t/LpDBp2cIXZdAhp9JzznoFkDPjWZ/es1DlwB6bSz71mMumgfQYyMZR+v5aB4A7EnTAFrXzZhazknTAGBvBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0Xbz4bhL/fPv56Xf+ij89OMPj2I7ehn6DJA+/BP7YJ1hA3Dg79kXyw0bANQgAKING4CLv3v2xXLDBjBx4O2DtYZ/GlQErDH0GQDWEgDRBEA0ARBNAEQTANEEQDQBEE0ARBMA0QRANAEQTQBEEwDRBEA0ARBt+DfE+ESEehLfXDT0GcDw15W4P4cNIPFgtZC2X4cNAGoQANGGDSDxgq2FtP06bACTtIO1tcT9OfzToIkHjXqGPgPAWgIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiCYAogmAaAIgmgCIJgCiCYBow78jLO1jPE55R9w6Q58B0od/Yh+sM2wADvw9+2K5YQOAGgRAtGEDcPF3z75YbtgAJg68fbDW8E+DioA1hj4DwFoCIJoAiCYAogmAaAIgmgCIJgCiCYBoAiCaAIgmAKIJgGgCIJoAiCYAog3/hhifiFBP4puLhj4DGP66EvfnsAEkHqwW0vbr8Esg9u2Xt7/NvoN/vfl99m1rEQBVlQz8qePvfXbz5Ml/f/5a9b6dM2wA0wVb2um6hSUXwmuG/iHPbj7efXmrGIYNYCKCukqHf6vBP+cQQ+0Qhg7gEAFttRz8U7VDGD4A2uk5+FuFMOzToLS1p+E/dnydsIQAuGqvw3+wJgJLIC7a++CfOxOUXiQ7A3DWSMO/ZkkkAL4z6vAvWRIJgG+MPvylEQiAaALgzmN59C85CwiArx7b8M+NQAA82uGfE4EAiCaAcKMtff5++8eiI3bp1WIBMIzD8C+N4BwBBBvp0f906JdEcO4sIAB279KwL4nglABCjfTo/5DSCE7PAgJg1+YM+JzbXCIAdqtksEtue0wAgUZY/pQO9M9vbmcfyeNlkADYnS2H30Uwu9Zy+CfOAEQTQJg9r/9bPvofrgMEwC60HH7PAlFN6eCeU/ozSp7xucYZgMVq/HFaz+F3EcxiNf44rffwC4BFavxxWunwb8USiCLXBvfa15eque4/1jSAl6/eL91+dmDucF+73bWvn9pq+C2BmK10aGsskyZbDn+XAJwFxlRjEEsjqvE7r2m6BDoQwZhKB/J44Pc4/JOnL27ffel1OD59eN3rV0db++cQpcNcqjS0JQ4fo97lDOBMMLYWA9pK1wAm03LIkmg8W0Ww1c+9pOsSiD7W/EuhUzWXQy2HfxdLIPoo/TdCLfQY/kn3JRBjqzG4NX7GUgJgtTUDvOZ7axBAqNrLoN6DPNfpdguAakojKL39FgQQrPZZYDJ3qOferqZz2ysAqrs23Ne+3pLXAaj6usCp09cJeg3/pbPdc8efLfUa+LksgdjkWmBPHrrWEQBfPTQkI7u2XQLgzrVhGc2c7REA0QTAN+Y8ao5g7nYIgO/MHZ69Krn/AuCskiHak9L77XUALrp708jNx93vpdLBP3AG4Kqlw9XKmvsnAGZZM2RbWnu/LIGYbU9LorWDfyAAivUModbgH/wPgGZgc7qoC+gAAAAASUVORK5CYII=", "sizes": "192x192", "type": "image/png", "purpose": "any"}, {"src": "data:image/png;base64,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", "sizes": "512x512", "type": "image/png", "purpose": "any"}, {"src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAAQRUlEQVR4Xu3dPW4cVxqGUYngBpQoEARMbBjagPMJlTnwBmYDTh1LoTcwG3DgzHvQBgxjYicKlGgH1qDH7hHVZv9W1f353nNSkd3V7Mv6nrpFUk9fvn776QkAEOUu6tUCAP8jAAAgkAAAgEACAAACCQAACCQAACCQAACAQAIAAAIJAAAIJAAAIJAAAIBAAgAAAgkAAAgkAAAgkAAAgEACAAACCQAACCQAACCQAACAQAIAAAIJAAAIJAAAIJAAAIBAAgAAAgkAAAgkAAAgkAAAgEACAAACCQAACCQAACCQAACAQAIAAAIJAAAIJAAAIJAAAIBAAgAAAgkAAAgkAAAgkAAAgEACAAACCQAACCQAACCQAACAQAIAAAIJAAAIJAAAIJAAAIBAAgAAAgkAAAgkAAAgkAAAgEACAAACCQAACCQAACCQAACAQAIAAAIJAAAIJAAAIJAAAIBAAgAAAgkAAAgkAAAgkAAAgEACAAACCQAACCQAACCQAACAQAIAAAIJAAAIJAAAIJAAAIBAAgAAAgkAAAgkAAAgkAAAgEACAAACCQAACCQAACCQAACAQAIAAAIJAAAIJAAAIJAAAIBAAgAAAgkAAAgkAAAgkAAAgEACAAACCQAACCQAACCQAACAQAIAAAIJAAAIJAAAIJAAAIBA94GvmQv856fvL/goYBZffffjLIdKI09fvn77qdFzMTADH3KIAXYEQDiDH7KJgVwCIJTBDzwkBPL4IcBAhj9wyHkhjx2AIL7BgUvYDchgByCE4Q9cyvkigwAI4JsZuJbzRn0CoDjfxMCtnD9qEwCF+eYFlnIeqUsAFOWbFliL80lNAgAAAgmAgtQ6sDbnlXoEQDG+SYGtOL/UIgAAIJAAKESdA1tznqlDAABAIAFQhCoHWnG+qUEAAEAgAQAAgQQAAAQSAAW4Hwe05rwzPwEAAIEEAAAEEgAAEEgAAEAgAQAAgQQAAAQSAAAQSAAAQCABAACBBAAABBIAABBIAABAIAEAAIEEAAAEEgAAEEgAAEAgAQAAgQQAAAQSAAAQSAAAQCABAACBBAAABBIAABBIAABAIAEAAIEEAAAEEgAAEEgAAEAgAQAAgQQAAAQSAAAQSAAAQCABAACBBAAABBIAABBIAABAIAEAAIEEAAAEEgAAEEgAAEAgAQAAgQQAAAS6D3zNDOL9h4+DHAktvXj+rOXTAUcIAJoz+LPt338hAH25BUBThj971gL0JQBoxgmfQ9YE9CMAaMKJnmOsDehDAABAIAHA5lzhcY41Au0JAAAIJAAAIJAAAIBAAgAAAgkAAAgkANicP/nKOdYItCcAACCQAKAJV3gcY21AHwKAZpzoOWRNQD8CgKac8NmzFqCv+75PT6L9id+ff81k8MMYBADdGAQA/bgFAACBBAAABBIAABBIAABAIAEAAIEEAAAEEgAAEEgAAEAgAQAAgQQAAAQSAAAQSAAAQCABAACBBAAABBIAABBIAABAIAEAAIEEAAAEEgAAEEgAAEAgAQAAgQQAAAQSAAAQSAAAQCABAACBBAAABBIAABBIAABAIAEAAIEEAAAEEgAAEEgAAEAgAQAAgQQAAAS6D3zNDOL9h4+DHAl86cXzZ74klCcAaM7gZ3T7NSoEqMwtAJoy/JmJ9UplAoBmnEyZkXVLVQKAJpxEmZn1S0UCAAACCQA25+qJCqxjqhEAABBIAABAIAEAAIEEAAAEEgAAEEgAsDl/TpUKrGOqEQAAEEgA0ISrJ2Zm/VKRAKAZJ1FmZN1SlQCgKSdTZmK9Utl95RfHmPYnVX9alVEZ/CQQAHTjJAvQj1sAABBIAABAIAEAAIEEAAAEEgAAEEgAAEAgAQAAgQQAAAQSAAAQSAAAQCABAACBBAAABBIAABBIAABAIAEAAIEEAAAEEgAAEEgAAEAgAQAAgQQAAAQSAAAQSAAAQCABAACBBAAABBIAABBIAABAIAEAAIEEAAAEEgAAEEgAAEAgAQAAgQQAAAQSAAAQSAAAQCABAACB7gNfM4N4/+HjIEdCSy+eP2v5dMARAoDmDP5s+/dfCEBfbgHQlOHPnrUAfQkAmnHC55A1Af0IAJpwoucYawP6EAAAEEgAsDlXeJxjjUB7AgAAAgkAAAgkAAAgkAAAgEACAAACCQA250++co41Au0JAAAIJABowhUex1gb0IcAoBkneg5ZE9CPAKApJ3z2rAXo677v05Nof+L3518zGfwwBgFANwYBQD9uAQBAIAEAAIEEAAAEEgAAEEgAAEAgAQAAgQQAAAQSAAAQSAAAQCABAACBBAAABBIAABBIAABAIAEAAIEEAAAEEgAAEEgAAEAgAQAAgQQAAAQSAAAQSAAAQCABAACB7gNfM0AZX7/5drXX8tsPP6/2WIxPAAAMbs0hf8qp5xEH9QgAgMG0GvjXODwmQTA/AQDQ2YgD/5zdMd+9+vxRf/z6zblPYTACAKCDGYf+KXev3v3/n8XAHAQAQCPVhv4xYmAOAgBgYymD/zH7GLArMB4BALCB5KF/KgR2xMAYBADAigz+8+wKjEEAAKzA4L+eEOhLAAAsYPAvJwT6EAAANzD41ycE2hIAdPP+w8duzw2nvHj+7OS/G/7b2oWAHxTcngCgOYOf0e3X6GEIGPzt2A3YngCgKcOfmezW6y4CDP5+hMB27rZ7aPiS4c+MDP8xPPzrgqxDANCE4c+M/vnvf8142GWJgHW5BQBwwOAfl1sC67EDwOZc/TMTw38OdgOWEwAAfzH85yIClnELAIhn8M/LLYHb2QEAohn+NdgNuJ4AAGIZ/rWIgOsIACCS4V+TCLicAGBz5/6uOrRm+NcmAi4jAIAohn8GEXCeAKAJuwCMwPDPIgJOEwA0IwLoyfDPJAKOEwA0JQLowfDPJgIeJwBobhcBQoBWDH92RMDf+UuAdCMC2Jr/ypeHdhHwx6/f+KL8xQ4AUJLhz2PsBHwmAAAgkAAAynH1zyl2Af4kAIBSDH8uIQIEAFCI4c810iPADgAABBIAQAmu/rlF8i6AAACmZ/izRGoECABgaoY/a0iMAAEAAIEEADAtV/+sKW0XQAAAQCABAEzJ1T9bSNoFEADAdAz/On5/88twLyYlAgQAAF3sh/+IEZBAAABTcfVfw+HQHy0CEnYBBAAAQxgtAqoTAMA0XP3XcGrQjxQB1XcBBAAAzVwy4Hcfc8nHsYwAAKbg6n9+1w71az9+C5V3AQQAAJu7dZjf+nmcJwCA4bn6n9vSIb7085equgsgAAAYXu8IqEgAALCZNQf3mo/FEwEAjM32/7y2GNhbPOYlKt4GsAMAwOq2HNRbPnYSAQAMy9X/nFoM6B5/K6DaLoAAAGA1LYb/Q62frxIBAMDURMBtBAAwJNv/8+k5iFs9d6XbAAIAgMVaDeBj/vHD68WvIY0AAGARw39OAgAYju3/efQe/j1UuQ0gAAC4yQjD39b/7QQAAFMy/JcRAABcrffVv+G/nAAAhuL+//gM/yclfg5AAABwMcO/DgEAwEV6D3/WJQAAOGuE4e++/7oEADAM9/85ZsThP/vfAxAAAJzU++p/xOFfgQAA4CjDvy4BAMCjDP/aBAAAf9N7+LM9AQDAF0YY/u77b08AADAUw78NAQAMwa8AjqH31f9sw3/mXwUUAAAb6T1Mr9X7eGcb/rMTAAAb2A/T3kP1Ur2P0/BvTwAArOxwmPYerueMfnxsQwAArOjYMDVkj3P134cAAFjJuSF/7t976H1Mhn8/AgBgod0QvXSQXvpxLfQ+FsO/LwEAsMAtQ/SWz1lb72Mw/PsTAAA3WjJEl3zuUj2fe8fwH4MAALjBGkN0jce4Vo/nZEwCoICvvvuxwKuAeRiit3P1Pw4BAHCFtYf/2o93SsvneozhPxYBAHChrQboVo/7UIvnOMXwH48AKMJtANjW1gN0y8ff8rEvYfiPSQAAnHDN7/gvtcWg3uIxr2H4j0sAABzRY3iu+ZxrPhb1CIBC3AaA9fQcnj2fe02u/scmAAAOjDCAlx7D0s9fyvAfnwAoxi4ALDfK8Lp1iN/6eWsZ5evHaQKgIBHAjH774eehDnuUIXbtML/249c2ytetlT9+/abVU61OAAAcMcowu3SoX/pxsCMAirILAOuYJQJGGP6jfK24jAAoTATAOkYZbCMM+dF3S7icAChOBMA6Ro6A3mEwyteG6wiAACIA1jHKoHs48A1/biUAQogAWMdIEWD4s4QACLKLACHAyEb7VUA4ZeZfAdwRAIFEACwzyi5AT74G8xMAoewGwDLJAzD5tVciAMIJAbhd4iBMfM1VPX35+u2nqi+O2/3np+9v/2RY6Os33y58hLZ6/zBeK4b/Z7Pf/98RAMBw7l69G+6YzqkeAYb/lyoEgFsAACswIJmNAABYSdUIqPq60gkAYDgzb69WG5bVXs8aZl6fDwkAgJVVGZpVXgePEwAAG5h9eM5+/JwnAIAhVdhmnXWIznrcLVRYl3sCAGBDhimjEgAAG5spAmY6VpYRAMCwKm23zjBYZzjGniqtxx0BANDIyAN25GNjGwIAGFq1q64RB+2IxzSaauvQDgBAByMN3JGOhbbsAABAIAEADK/i9usIV94jHMMMKq6/HQEA0EnPAdzzuRmDAACmUPUqrMcg7vGcs6q67uwAAAyg5UBu+VyMzQ4AMI3KV2MtBnOL56ik8nqzAwAwEAOaluwAAFOpflW2VQRs9bhVVV9ndgAABrT2sF778ajh6cvXbz/VeClAkrtX78q/3N/f/LLoNRr8t0m4+rcDAEwr4SS9ZIAv+dxkCetqz88AAAzslkF+y+eQxy0AYGoJtwIeOnZbwNBfLunqf+d++ZcMgFYMetbiFgAwtbSrNraRuI4EADC9xJM360ldPwIAKCH1JM4yyetGAABAIAEAlJF8Ncf10teLAABKST+pcxnr5IkAAOpxcucU6+NPdgAAIJAAAEpylcdjrIvPBABQlpM9D1kPXxIAQGlO+uxYB38nAIDynPyzef8fJwCACIZAJu/7cQIAiGEYZPF+nyYAgCiGQgbv83kCAIhjONTm/b2MAAAiGRI1eV8vJwCAWIZFLd7P6wgAIJqhUYP38Xr3138KQC374XH36l2tFxbA4L+dHQCAvxgmc/F+LSMAAB4wVObgfVrOLQCAA24JjMvgX48dAIAjDJuxeD/WJQAATjB0xuB9WJ9bAABnuCXQj8G/HQEAcCEh0I7Bvz23AACuZDhty9e3DTsAADewG7A+g78tAQCwgBBYzuDvQwAArEAIXM/g70sAAKxICJxn8I9BAABs4OGQ858MPTH0ByQAADaWvCvgan9cAgCgkZRdAUN/DgIAoINqMWDoz0cAAHR2ODxn+JkBA39+AgBgMCMGgYFfjwAAGNyp4bvmboEhn0UAAEzM0OZW/jMgAAgkAAAgkAAAgEACAAACCQAACCQAACCQAACAQAIAAAIJAAAIJAAAIJAAAIBAAgAAAgkAAAgkAAAgkAAAgEACAAACCQAACCQAACCQAACAQAIAAAIJAAAIJAAAIJAAAIBAAgAAAgkAAAgkAAAgkAAAgEACAAAC/Re3+p0peLK1kAAAAABJRU5ErkJggg==", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]};var base=location.href.replace(/[#?].*$/,"").replace(/[^\/]*$/,"");m.start_url=base;m.scope=base;
+document.getElementById("manifest-link").setAttribute("href","data:application/manifest+json,"+encodeURIComponent(JSON.stringify(m)));})();
+</script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Dossier locataire · contrôle des justificatifs</p>
+    <h1>Vérificateur de bulletins de paie</h1>
+    <p class="lede">Déposez les bulletins du candidat en PDF. L'outil inspecte le fichier, refait les calculs et contrôle les numéros officiels. Tout se fait sur votre appareil : aucun document n'est envoyé.</p>
+  </header>
+
+  <section class="drop" id="drop" aria-label="Déposer des bulletins">
+    <p>Glissez les PDF ici, ou choisissez-les. Pour une photo ou un scan, utilisez la saisie manuelle.</p>
+    <div class="btns">
+      <button class="btn" id="pick" type="button">Choisir des bulletins</button>
+      <button class="btn ghost" id="manual" type="button">Saisie manuelle</button>
+    </div>
+    <input type="file" id="file" accept="application/pdf,image/*" multiple hidden>
+    <p class="status" id="status" aria-live="polite"></p>
+  </section>
+
+  <p class="banner" id="exbanner"><b>Exemple fictif.</b> Deux bulletins inventés montrent ce que l'outil repère. Ils disparaissent dès que vous déposez vos propres fichiers.</p>
+
+  <section class="verdict" id="verdict" aria-live="polite"></section>
+
+  <section class="list" id="list" aria-label="Bulletins analysés"></section>
+
+  <section class="panel">
+    <h2>Recoupement avec l'avis d'imposition</h2>
+    <p class="foot">Le revenu de l'avis porte sur l'année précédente. Saisissez le montant « salaires » déclaré pour le candidat : l'outil le compare au net imposable des bulletins.</p>
+    <div class="inline">
+      <label for="avis">Salaires déclarés sur l'avis (€ par an)
+        <input type="text" id="avis" inputmode="decimal" placeholder="ex. 30 500">
+      </label>
+    </div>
+    <div class="links">
+      <a href="https://cfsmsp.impots.gouv.fr/secavis/" target="_blank" rel="noopener">Vérifier l'avis d'imposition sur impots.gouv →</a>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>À faire vous-même avant de valider</h2>
+    <label class="check" for="c1"><input type="checkbox" id="c1"><span>Consulter la fiche de l'employeur sur l'<a href="https://annuaire-entreprises.data.gouv.fr/" target="_blank" rel="noopener">annuaire des entreprises</a> : société active, adresse identique au bulletin, effectif cohérent avec le poste.</span></label>
+    <label class="check" for="c2"><input type="checkbox" id="c2"><span>Appeler l'employeur sur un numéro trouvé par vous-même (site officiel, annuaire), jamais celui fourni dans le dossier.</span></label>
+    <label class="check" for="c3"><input type="checkbox" id="c3"><span>Vérifier l'avis d'imposition avec son numéro fiscal et sa référence, puis comparer le revenu aux bulletins.</span></label>
+    <label class="check" for="c4"><input type="checkbox" id="c4"><span>Comparer avec le contrat de travail ou l'attestation employeur : même poste, même date d'entrée, même salaire.</span></label>
+    <label class="check" for="c5"><input type="checkbox" id="c5"><span>En cas de doute, proposer au candidat de passer par <a href="https://www.dossierfacile.logement.gouv.fr/" target="_blank" rel="noopener">DossierFacile</a>, dont les pièces sont contrôlées par l'État.</span></label>
+  </section>
+
+  <p class="foot">Un signal n'est pas une preuve. Un bulletin peut être retouché légitimement (masquer le numéro de sécurité sociale, par exemple). Devant un doute, demandez le PDF d'origine ou une pièce complémentaire. Les pièces exigibles d'un candidat sont fixées par le décret n° 2015-1437.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const eur=n=>n==null||isNaN(n)?"—":n.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
+const pct=n=>(n*100).toLocaleString("fr-FR",{maximumFractionDigits:1})+" %";
+const fdate=d=>d?d.toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})+" à "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"—";
+const MOIS=["JANVIER","FEVRIER","MARS","AVRIL","MAI","JUIN","JUILLET","AOUT","SEPTEMBRE","OCTOBRE","NOVEMBRE","DECEMBRE"];
+const moisLabel=p=>{if(!p)return "période inconnue";const [y,m]=p.split("-").map(Number);return new Date(y,m-1,1).toLocaleDateString("fr-FR",{month:"long",year:"numeric"});};
+
+if(window.pdfjsLib && !window.pdfjsWorker){
+  try{pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob(['importScripts("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js")'],{type:"text/javascript"}));}catch(e){}
+}
+
+/* ---------- Lecture des nombres ---------- */
+const AMT=/-?\d{1,3}(?:[   .]\d{3})+,\d{2}(?!\d)|-?\d+[.,]\d{2}(?!\d)/g;
+function parseAmt(s){
+  if(s==null)return null; s=String(s).trim(); if(!s)return null;
+  s=s.replace(/[   €]/g,"");
+  if(s.includes(",")) s=s.replace(/\./g,"").replace(",",".");
+  const n=parseFloat(s); return isNaN(n)?null:n;
+}
+const amountsIn=line=>(line.match(AMT)||[]).map(parseAmt).filter(n=>n!=null);
+const norm=s=>s.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase();
+
+/* ---------- Numéros officiels ---------- */
+function luhn(d){let s=0;for(let i=0;i<d.length;i++){let n=+d[d.length-1-i];if(i%2){n*=2;if(n>9)n-=9;}s+=n;}return s%10===0;}
+function siretState(d){
+  d=(d||"").replace(/\D/g,"");
+  if(!d)return "absent";
+  if(d.length!==14)return "format";
+  if(d.startsWith("356000000"))return d.split("").reduce((a,c)=>a+ +c,0)%5===0?"ok":"bad";
+  return luhn(d)&&luhn(d.slice(0,9))?"ok":"bad";
+}
+function nirState(s){
+  s=(s||"").replace(/\s/g,"").toUpperCase();
+  if(!s)return "absent";
+  if(!/^[12378]\d{4}(\d{2}|2A|2B)\d{8}$/.test(s))return "format";
+  let body=s.slice(0,13); const dep=body.slice(5,7);
+  if(dep==="2A")body=body.slice(0,5)+"19"+body.slice(7);
+  if(dep==="2B")body=body.slice(0,5)+"18"+body.slice(7);
+  return 97-Number(BigInt(body)%97n)===+s.slice(13)?"ok":"bad";
+}
+
+/* ---------- Extraction des champs depuis le texte ---------- */
+function findAmount(lines,include,exclude,pick){
+  for(const line of lines){
+    const m=include.exec(line); if(!m)continue;
+    if(exclude&&exclude.test(line))continue;
+    const a=amountsIn(line.slice(m.index+m[0].length)).filter(n=>Math.abs(n)>=1);
+    if(a.length)return pick==="first"?a[0]:a[a.length-1];
+  }
+  return null;
+}
+function extractFields(rawLines){
+  const lines=rawLines.map(norm);
+  const all=lines.join(" | ");
+  const f={};
+  f.brut=findAmount(lines,/SALAIRE BRUT|TOTAL BRUT|BRUT TOTAL|BRUT SOCIAL/,/CUMUL|ANNUEL/)??findAmount(lines,/\bBRUT\b/,/CUMUL|ANNUEL|BASE|PLAFOND|ABATT/);
+  f.netAvantImpot=findAmount(lines,/NET A PAYER AVANT IMPOT|NET AVANT IMPOT|NET A PAYER AVANT PRELEVEMENT|NET A PAYER AVANT/,/CUMUL/);
+  f.netAPayer=findAmount(lines,/NET A PAYER|NET PAYE|NET VERSE|NET A VERSER/,/AVANT|CUMUL/);
+  f.netImposable=findAmount(lines,/NET IMPOSABLE|NET FISCAL/,/CUMUL/);
+  const pas=findAmount(lines,/IMPOT SUR LE REVENU|PRELEVEMENT A LA SOURCE/,/AVANT|CUMUL|NET A PAYER|NET IMPOSABLE/);
+  f.pas=pas==null?null:Math.abs(pas);
+  f.cumulBrut=null;
+  for(let i=0;i<lines.length&&f.cumulBrut==null;i++){
+    if(!/CUMUL/.test(lines[i]))continue;
+    const block=lines.slice(i,i+4).join(" | ");
+    const m=/BRUT(?: SOCIAL| FISCAL)?[^0-9\-]{0,40}/.exec(block);
+    if(m){const a=amountsIn(block.slice(m.index+m[0].length)).filter(n=>n>=1);if(a.length)f.cumulBrut=a[0];}
+  }
+  let m=/SIRET[^0-9]{0,15}((?:\d[ . ]?){13}\d)/.exec(all)||/\b(\d{3} ?\d{3} ?\d{3} ?\d{5})\b/.exec(all);
+  f.siret=m?m[1].replace(/\D/g,""):"";
+  m=/\b([12378]) ?(\d{2}) ?(\d{2}) ?(\d{2}|2A|2B) ?(\d{3}) ?(\d{3}) ?(\d{2})\b/.exec(all);
+  f.nir=m?m.slice(1).join(" "):"";
+  f.periode="";
+  m=/PERIODE[^|]{0,40}?(\d{2})[\/.](\d{2})[\/.](20\d{2})/.exec(all);
+  if(m)f.periode=m[3]+"-"+m[2];
+  if(!f.periode){m=new RegExp("("+MOIS.join("|")+")\\s+(20\\d{2})").exec(all);if(m)f.periode=m[2]+"-"+String(MOIS.indexOf(m[1])+1).padStart(2,"0");}
+  if(!f.periode){m=/PERIODE[^|]{0,20}?\b(\d{2})\/(20\d{2})\b/.exec(all);if(m)f.periode=m[2]+"-"+m[1];}
+  f.ape=/\b(APE|NAF)\b/.test(all);
+  f.ccn=/CONVENTION COLLECTIVE|CONV\.? COLL|IDCC/.test(all);
+  return f;
+}
+
+/* ---------- Lecture du PDF ---------- */
+function pdfDate(s){
+  if(!s)return null;
+  const m=/D:(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?([Z+\-])?(\d{2})?'?(\d{2})?/.exec(s);
+  if(!m)return null;
+  const [y,mo,d,h,mi,se]=[m[1],m[2]||"01",m[3]||"01",m[4]||"00",m[5]||"00",m[6]||"00"];
+  let iso=`${y}-${mo}-${d}T${h}:${mi}:${se}`;
+  if(m[7]==="Z")iso+="Z"; else if(m[7]&&m[8])iso+=`${m[7]}${m[8]}:${m[9]||"00"}`;
+  const dt=new Date(iso); return isNaN(dt)?null:dt;
+}
+async function readPdf(file){
+  const buf=new Uint8Array(await file.arrayBuffer());
+  const raw=new TextDecoder("latin1").decode(buf);
+  const meta={pages:0,hasText:false,producer:"",creator:"",created:null,modified:null};
+  meta.linearized=/\/Linearized/.test(raw.slice(0,2048));
+  meta.eof=(raw.match(/%%EOF/g)||[]).length;
+  meta.saves=Math.max(1,meta.eof-(meta.linearized?1:0));
+  const fonts={};
+  for(const fm of raw.matchAll(/\/BaseFont\s*\/([A-Za-z0-9+\-_,#.]+)/g)){
+    const full=fm[1]; const base=full.replace(/^[A-Z]{6}\+/,"");
+    (fonts[base]=fonts[base]||new Set()).add(full);
+  }
+  meta.fonts=Object.keys(fonts);
+  meta.dupFonts=meta.fonts.filter(k=>fonts[k].size>1);
+  const pdf=await pdfjsLib.getDocument({data:buf.slice(),isEvalSupported:false}).promise;
+  meta.pages=pdf.numPages;
+  try{const md=await pdf.getMetadata();const i=md.info||{};
+    meta.producer=i.Producer||"";meta.creator=i.Creator||"";meta.created=pdfDate(i.CreationDate);meta.modified=pdfDate(i.ModDate);
+    if(md.metadata){try{const x=md.metadata.getAll();meta.producer=meta.producer||x["pdf:producer"]||"";meta.creator=meta.creator||x["xmp:creatortool"]||"";}catch(e){}}
+  }catch(e){}
+  const lines=[]; const styleFonts=new Set();
+  for(let p=1;p<=Math.min(pdf.numPages,4);p++){
+    const page=await pdf.getPage(p);
+    const tc=await page.getTextContent();
+    Object.values(tc.styles||{}).forEach(s=>s&&s.fontFamily&&styleFonts.add(s.fontFamily));
+    const rows=[];
+    for(const it of tc.items){
+      if(!it.str||!it.str.trim())continue;
+      const y=it.transform[5],x=it.transform[4];
+      let row=rows.find(r=>Math.abs(r.y-y)<=2.5);
+      if(!row){row={y,items:[]};rows.push(row);}
+      row.items.push({x,s:it.str});
+    }
+    rows.sort((a,b)=>b.y-a.y);
+    for(const r of rows){r.items.sort((a,b)=>a.x-b.x);lines.push(r.items.map(i=>i.s.trim()).join("  "));}
+  }
+  meta.hasText=lines.join("").replace(/\s/g,"").length>40;
+  return {meta,fields:extractFields(lines)};
+}
+
+/* ---------- Analyse d'un bulletin ---------- */
+const W={crit:45,high:25,med:12,low:5,ok:0,info:0};
+const SEV_LABEL={crit:"Critique",high:"Fort",med:"Moyen",low:"Faible",ok:"OK",info:"Info"};
+const EDITORS=/photoshop|gimp|illustrator|inkscape|canva|pixelmator|affinity|paint\.net|pdf-xchange|pdfescape|sejda|smallpdf|ilovepdf|pdffiller|dochub|foxit (phantom|pdf editor)|pdf candy|pdf2go|soda pdf|nitro|wondershare|pdfelement|formswift|pdfsimpli/i;
+const OFFICE=/microsoft.{0,3}word|\bword\b|libreoffice|openoffice|writer|google docs|\bpages\b/i;
+const EXCEL=/excel|calc|numbers/i;
+const WEBGEN=/fpdf|tcpdf|mpdf|dompdf|jspdf|html2pdf|pdfmake|pdf-lib/i;
+const BROWSER=/skia|chrom|wkhtml|webkit|reportlab|itext|quartz/i;
+const PAYROLL=/silae|sage|cegid|\badp\b|payfit|quadra|\bebp\b|ciel|nibelis|meta4|peoplesphere|\bega\b|\bsap\b|workday|hr access|talentia|zadig|openpaye|isapaye|sylae|decidium|eurecia|lucca|\bsilaexpert|cegedim|paie/i;
+
+function analyze(b){
+  const out=[]; const add=(sev,t,d)=>out.push({sev,t,d});
+  const f=b.fields, m=b.meta;
+  if(b.source==="image") add("low","Photo ou scan, pas un PDF d'origine","Les contrôles du fichier sont impossibles. Demandez le PDF reçu de l'employeur ou de son espace en ligne.");
+  if(b.source==="locked") add("med","PDF protégé par mot de passe","Impossible de lire le fichier. Demandez une version non protégée, ou saisissez les montants à la main.");
+  if(m){
+    if(!m.hasText) add("med","Aucun texte lisible dans le PDF","Le document est une image (scan ou photo convertie). Un logiciel de paie produit du texte sélectionnable. Saisissez les montants ci-dessous et demandez l'original.");
+    const sw=(m.producer+" "+m.creator).trim();
+    if(sw){
+      if(EDITORS.test(sw)) add("high","Passé par un logiciel de retouche",`Le fichier indique « ${esc(sw)} ». Ces outils servent à modifier un PDF ou une image ; un bulletin authentique sort d'un logiciel de paie.`);
+      else if(WEBGEN.test(sw)) add("med","Créé par un générateur de PDF web",`Logiciel indiqué : « ${esc(sw)} ». C'est la technologie des sites qui fabriquent des « fiches de paie » en ligne.`);
+      else if(OFFICE.test(sw)) add("med","Créé avec un traitement de texte",`Logiciel indiqué : « ${esc(sw)} ». Les logiciels de paie n'utilisent pas Word ou Writer.`);
+      else if(/acrobat (pro|dc|standard)/i.test(sw)) add("med","Enregistré avec Acrobat",`« ${esc(sw)} » permet d'éditer le texte d'un PDF. Possible aussi pour une simple fusion de pages.`);
+      else if(PAYROLL.test(sw)) add("ok","Logiciel de paie identifié",`« ${esc(sw)} »`);
+      else if(EXCEL.test(sw)) add("low","Créé depuis un tableur",`« ${esc(sw)} ». Courant dans les très petites entreprises, mais facile à modifier.`);
+      else if(BROWSER.test(sw)) add("low","Imprimé depuis un navigateur ou une bibliothèque générique",`« ${esc(sw)} ». Normal pour une paie téléchargée sur un portail en ligne ; vérifiez le reste.`);
+      else add("info","Logiciel d'origine",`« ${esc(sw)} »`);
+    } else if(m.hasText) add("low","Aucune information sur le logiciel d'origine","Les métadonnées ont été effacées. Cela arrive après un passage par certains outils de nettoyage ou de retouche.");
+    if(m.created&&m.modified){
+      const diff=(m.modified-m.created)/1000;
+      if(diff>120){const j=diff/86400;add(j>1?"high":"med","Modifié après sa création",`Créé le ${fdate(m.created)}, modifié le ${fdate(m.modified)}${j>=1?` (${Math.round(j)} jour${Math.round(j)>1?"s":""} plus tard)`:""}.`);}
+    }
+    if(m.saves>1) add(m.saves>2?"high":"med","Enregistré en plusieurs fois",`Le fichier contient ${m.saves} versions successives. Une retouche ajoute souvent une version par-dessus l'original.`);
+    if(m.dupFonts&&m.dupFonts.length) add("med","Même police intégrée plusieurs fois",`${esc(m.dupFonts.slice(0,3).join(", "))}. Typique d'un texte réécrit par-dessus l'original avec un autre outil.`);
+    else if(m.fonts&&m.fonts.length>7) add("low","Nombre de polices élevé",`${m.fonts.length} polices différentes. Un bulletin en utilise d'ordinaire 2 à 5.`);
+  }
+
+  // Numéros
+  const ss=siretState(f.siret);
+  if(ss==="ok") add("ok","SIRET valide",`<span class="num">${esc(f.siret.replace(/(\d{3})(\d{3})(\d{3})(\d{5})/,"$1 $2 $3 $4"))}</span> · <a href="https://annuaire-entreprises.data.gouv.fr/etablissement/${esc(f.siret)}" target="_blank" rel="noopener">voir l'établissement →</a>`);
+  else if(ss==="bad") add("crit","SIRET invalide",`Le numéro <span class="num">${esc(f.siret)}</span> ne respecte pas la clé de contrôle officielle. Il a été inventé ou mal recopié.`);
+  else if(ss==="format") add("high","SIRET incomplet",`« ${esc(f.siret)} » n'a pas 14 chiffres.`);
+  else add("med","SIRET non trouvé","Mention obligatoire. Saisissez-le ci-dessous s'il figure sur le bulletin.");
+  const ns=nirState(f.nir);
+  if(ns==="bad") add("high","Numéro de sécurité sociale invalide","Sa clé (2 derniers chiffres) ne correspond pas. Un vrai numéro calculé par l'employeur ne contient pas cette erreur.");
+  else if(ns==="ok") add("ok","Numéro de sécurité sociale cohérent","La clé de contrôle est juste.");
+
+  // Montants
+  const brut=parseAmt(f.brut), nAP=parseAmt(f.netAPayer), nAI=parseAmt(f.netAvantImpot), nImp=parseAmt(f.netImposable), pas=parseAmt(f.pas), cum=parseAmt(f.cumulBrut);
+  let netRef=nAI, refLabel="net avant impôt";
+  if(netRef==null&&nAP!=null&&pas!=null){netRef=nAP+pas;refLabel="net à payer + impôt prélevé";}
+  if(netRef==null&&nAP!=null){netRef=nAP;refLabel="net à payer (impôt inconnu)";}
+  if(brut!=null&&netRef!=null&&brut>0){
+    const r=netRef/brut;
+    if(r>1) add("crit","Net supérieur au brut",`${eur(netRef)} net pour ${eur(brut)} brut : impossible hors remboursements exceptionnels.`);
+    else if(r>0.845) add("high","Cotisations anormalement basses",`Le ${refLabel} représente ${pct(r)} du brut. Un salarié du privé est d'ordinaire entre 75 % et 80 %.`);
+    else if(r>0.82) add("med","Rapport net/brut un peu élevé",`${pct(r)} du brut. Possible (apprenti, exonérations), à confirmer.`);
+    else if(r<(nAI==null&&pas==null?0.6:0.68)) add("med","Rapport net/brut très bas",`${pct(r)} du brut. Peut venir d'une saisie sur salaire, d'un acompte ou d'une erreur de lecture : vérifiez les montants.`);
+    else add("ok","Rapport net/brut cohérent",`${pct(r)} (${refLabel} ${eur(netRef)} / brut ${eur(brut)}).`);
+  } else if(b.source!=="locked") add("info","Montants incomplets","Indiquez au moins le brut et le net à payer pour vérifier les calculs.");
+  if(nAI!=null&&pas!=null&&nAP!=null){
+    const gap=Math.abs(nAI-pas-nAP);
+    if(gap>1.01) add("high","Le net à payer ne tombe pas juste",`${eur(nAI)} − ${eur(pas)} d'impôt = ${eur(nAI-pas)}, mais le bulletin indique ${eur(nAP)} (écart de ${eur(gap)}).`);
+    else add("ok","Soustraction de l'impôt exacte",`${eur(nAI)} − ${eur(pas)} = ${eur(nAP)}.`);
+  }
+  if(nImp!=null&&(nAI??nAP)!=null){
+    const base=nAI??nAP; const r=nImp/base;
+    if(r<0.96||r>1.15) add("med","Net imposable incohérent",`${eur(nImp)} imposable pour ${eur(base)} net. Le net imposable dépasse normalement le net de 2 à 4 %.`);
+  }
+  if(pas!=null&&nImp){const t=pas/nImp; if(t>0.45) add("med","Taux d'impôt prélevé improbable",`${pct(t)} du net imposable.`);}
+  const round=[brut,nAP].filter(v=>v!=null&&v>=500&&v%50===0);
+  if(round.length) add("low","Montant parfaitement rond",`${round.map(eur).join(", ")}. Rare après calcul des cotisations.`);
+
+  // Période et cumuls
+  if(f.periode){
+    const [y,mo]=f.periode.split("-").map(Number);
+    const now=new Date(); const months=(now.getFullYear()-y)*12+(now.getMonth()+1-mo);
+    if(months<0) add("high","Période dans le futur",`Bulletin de ${moisLabel(f.periode)}.`);
+    else if(months>4) add("low","Bulletin ancien",`${moisLabel(f.periode)}. Demandez les 3 derniers.`);
+    if(cum!=null&&brut!=null){
+      if(cum+1<brut) add("high","Cumul annuel inférieur au salaire du mois",`Cumul brut ${eur(cum)} pour ${eur(brut)} ce mois-ci.`);
+      else if(mo===1&&Math.abs(cum-brut)>1) add("med","Cumul de janvier différent du brut",`En janvier le cumul doit égaler le brut du mois (${eur(cum)} contre ${eur(brut)}), sauf entrée en cours d'année non applicable ici.`);
+      else if(cum>brut*mo*1.6) add("med","Cumul annuel trop élevé",`${eur(cum)} après ${mo} mois, soit plus de 1,6 fois ${mo} × le brut mensuel.`);
+    }
+  } else if(b.source!=="locked") add("low","Période non trouvée","Indiquez le mois du bulletin pour activer les contrôles de date et de cumul.");
+  if(m&&m.hasText){
+    if(!f.ape) add("low","Code APE/NAF non trouvé","Mention obligatoire sur le bulletin.");
+    if(!f.ccn) add("low","Convention collective non trouvée","Mention obligatoire (ou la référence au Code du travail).");
+  }
+  return out;
+}
+function scoreOf(list){return list.reduce((a,x)=>a+W[x.sev],0);}
+function level(score,unknown){
+  if(unknown)return{cls:"lv-na",txt:"Incomplet",sub:"données insuffisantes"};
+  if(score>=40)return{cls:"lv-bad",txt:"Suspect",sub:"ne pas valider en l'état"};
+  if(score>=15)return{cls:"lv-warn",txt:"À vérifier",sub:"contrôles manuels requis"};
+  return{cls:"lv-ok",txt:"Cohérent",sub:"aucune anomalie majeure"};
+}
+
+/* ---------- Recoupements entre bulletins ---------- */
+function cross(list){
+  const out=[]; const add=(sev,t,d)=>out.push({sev,t,d});
+  const sirets=[...new Set(list.map(b=>(b.fields.siret||"").replace(/\D/g,"")).filter(Boolean))];
+  if(sirets.length>1) add("high","SIRET différents d'un bulletin à l'autre",`${sirets.map(s=>`<span class="num">${s}</span>`).join(", ")}. Un même employeur garde le même numéro, sauf changement d'établissement.`);
+  const dated=list.filter(b=>b.fields.periode).sort((a,b)=>a.fields.periode.localeCompare(b.fields.periode));
+  for(let i=1;i<dated.length;i++){
+    const A=dated[i-1],B=dated[i];
+    const [ya,ma]=A.fields.periode.split("-").map(Number),[yb,mb]=B.fields.periode.split("-").map(Number);
+    if(A.fields.periode===B.fields.periode){add("med","Deux bulletins pour le même mois",`${esc(A.name)} et ${esc(B.name)} : ${moisLabel(A.fields.periode)}.`);continue;}
+    const cA=parseAmt(A.fields.cumulBrut),cB=parseAmt(B.fields.cumulBrut),bB=parseAmt(B.fields.brut),bA=parseAmt(A.fields.brut);
+    if(ya===yb&&mb===ma+1&&cA!=null&&cB!=null&&bB!=null){
+      const exp=cA+bB;
+      if(Math.abs(exp-cB)>1.01) add("high","Les cumuls ne s'enchaînent pas",`${moisLabel(A.fields.periode)} : cumul ${eur(cA)}. Avec ${eur(bB)} de brut en ${moisLabel(B.fields.periode)}, le cumul devrait être ${eur(exp)} ; le bulletin indique ${eur(cB)}.`);
+      else add("ok","Cumuls cohérents d'un mois à l'autre",`${moisLabel(A.fields.periode)} → ${moisLabel(B.fields.periode)}.`);
+    }
+    if(bA&&bB){const v=Math.abs(bB-bA)/bA; if(v>0.3) add("low","Forte variation du brut",`${eur(bA)} puis ${eur(bB)} (${pct(v)}). Prime ou heures supplémentaires possibles.`);}
+  }
+  const avis=parseAmt($("#avis").value);
+  const imps=list.map(b=>parseAmt(b.fields.netImposable)).filter(v=>v!=null);
+  if(avis&&imps.length){
+    const annual=imps.reduce((a,v)=>a+v,0)/imps.length*12; const r=annual/avis;
+    if(r>1.35) add("high","Bulletins bien au-dessus de l'avis d'imposition",`Net imposable annualisé ≈ ${eur(annual)}, contre ${eur(avis)} déclarés. Hausse de salaire possible, mais à justifier (contrat, avenant).`);
+    else if(r<0.7) add("med","Bulletins bien en dessous de l'avis",`≈ ${eur(annual)} par an contre ${eur(avis)} déclarés.`);
+    else add("ok","Revenus cohérents avec l'avis d'imposition",`≈ ${eur(annual)} par an contre ${eur(avis)} déclarés (${pct(r)}).`);
+  }
+  return out;
+}
+
+/* ---------- État et rendu ---------- */
+let bulletins=[]; let uid=0; let example=true;
+const FIELDS=[
+  ["periode","Mois du bulletin","month"],["siret","SIRET employeur","text"],["brut","Salaire brut","amt"],
+  ["netAvantImpot","Net à payer avant impôt","amt"],["pas","Impôt prélevé à la source","amt"],["netAPayer","Net à payer","amt"],
+  ["netImposable","Net imposable","amt"],["cumulBrut","Cumul brut de l'année","amt"],["nir","N° de sécurité sociale","text"]];
+const fmtField=(k,v)=>v==null?"":(typeof v==="number"?v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/ /g," "):v);
+
+function findingsHTML(list){
+  if(!list.length)return "";
+  const order={crit:0,high:1,med:2,low:3,info:4,ok:5};
+  return list.slice().sort((a,b)=>order[a.sev]-order[b.sev]).map(x=>`<li class="f s-${x.sev}"><span class="chip">${SEV_LABEL[x.sev]}</span><div><p class="t">${x.t}</p>${x.d?`<p class="d">${x.d}</p>`:""}</div></li>`).join("");
+}
+function cardResult(b){
+  const res=analyze(b); const sc=scoreOf(res);
+  const unknown=b.source!=="pdf"&&b.source!=="exemple"&&!b.fields.brut&&!b.fields.siret;
+  const lv=level(sc,unknown);
+  b._score=unknown?null:sc;
+  $(`#pill-${b.id}`).className="pill "+lv.cls;
+  $(`#pill-${b.id}`).textContent=lv.txt;
+  $(`#fd-${b.id}`).innerHTML=findingsHTML(res);
+}
+function renderCard(b){
+  const m=b.meta;
+  const sub=b.source==="exemple"?"Exemple fictif":b.source==="image"?"Photo ou scan · saisie manuelle":b.source==="manuel"?"Saisie manuelle":b.source==="locked"?"PDF protégé":`PDF · ${m.pages} page${m.pages>1?"s":""}`;
+  const fileDl=m?`<dl class="file"><dt>Logiciel</dt><dd>${esc(m.producer||"—")}${m.creator&&m.creator!==m.producer?" / "+esc(m.creator):""}</dd><dt>Créé le</dt><dd>${fdate(m.created)}</dd><dt>Modifié le</dt><dd>${fdate(m.modified)}</dd><dt>Versions</dt><dd class="num">${m.saves}</dd><dt>Polices</dt><dd>${m.fonts.length?esc(m.fonts.join(", ")):"—"}</dd></dl>`:"";
+  const el=document.createElement("article");
+  el.className="card"; el.id="card-"+b.id;
+  el.innerHTML=`<div class="card-h"><div><h3>${esc(b.name)}</h3><p class="sub">${sub}${b.fields.periode?" · "+moisLabel(b.fields.periode):""}</p></div><div class="score"><span class="pill" id="pill-${b.id}"></span><button class="x" type="button" aria-label="Retirer ce bulletin" data-rm="${b.id}">×</button></div></div>
+  <ul class="findings" id="fd-${b.id}"></ul>
+  <details ${b.source==="manuel"||b.source==="image"||b.source==="locked"||(m&&!m.hasText)?"open":""}><summary>Valeurs lues sur le bulletin <span>· corrigez si une valeur est mal lue</span></summary>
+  <div class="grid">${FIELDS.map(([k,l,t])=>`<label for="f-${b.id}-${k}">${l}<input id="f-${b.id}-${k}" data-b="${b.id}" data-k="${k}" type="${t==="month"?"month":"text"}" ${t==="amt"?'inputmode="decimal"':""} value="${esc(fmtField(k,b.fields[k]))}" autocomplete="off"></label>`).join("")}</div>${fileDl}</details>`;
+  return el;
+}
+function renderAll(){
+  const list=$("#list"); list.innerHTML="";
+  bulletins.forEach(b=>{list.appendChild(renderCard(b));cardResult(b);});
+  renderSummary();
+  $("#exbanner").hidden=!example;
+}
+function renderSummary(){
+  const v=$("#verdict");
+  if(!bulletins.length){v.innerHTML=`<div class="stamp lv-na">En attente<small>aucun bulletin</small></div><div class="meta"><h2>Aucun bulletin déposé</h2><p class="foot">Ajoutez les 3 derniers bulletins du candidat pour contrôler aussi l'enchaînement des cumuls.</p></div>`;return;}
+  const cr=cross(bulletins);
+  const scores=bulletins.map(b=>b._score).filter(s=>s!=null);
+  const total=(scores.length?Math.max(...scores):0)+scoreOf(cr);
+  const lv=level(total,!scores.length);
+  const n=bulletins.length;
+  v.innerHTML=`<div class="stamp ${lv.cls}">${lv.txt}<small>${lv.sub}</small></div>
+  <div class="meta"><h2>Dossier : ${n} bulletin${n>1?"s":""} analysé${n>1?"s":""}</h2>
+  <p class="foot">Indice de risque <span class="num">${scores.length?total:"—"}</span> · basé sur le bulletin le plus douteux et les recoupements entre bulletins.${n<3?" Demandez les 3 derniers bulletins pour un contrôle complet.":""}</p>
+  ${cr.length?`<ul class="findings">${findingsHTML(cr)}</ul>`:""}</div>`;
+}
+
+/* ---------- Exemple ---------- */
+function loadExample(){
+  example=true;
+  bulletins=[
+    {id:++uid,name:"Exemple_bulletin_septembre.pdf",source:"exemple",
+     meta:{pages:1,hasText:true,producer:"Silae",creator:"Silae Paie",created:new Date(2026,9,2,9,14),modified:new Date(2026,9,2,9,14),saves:1,fonts:["Arial","Arial-Bold"],dupFonts:[]},
+     fields:{periode:"2026-09",siret:"81234560100023",brut:2650,netAvantImpot:2068.33,pas:93.07,netAPayer:1975.26,netImposable:2131.88,cumulBrut:23850,nir:"1 85 03 75 123 456 41",ape:true,ccn:true}},
+    {id:++uid,name:"Exemple_bulletin_octobre.pdf",source:"exemple",
+     meta:{pages:1,hasText:true,producer:"iLovePDF",creator:"Silae Paie",created:new Date(2026,10,1,8,40),modified:new Date(2026,10,6,22,17),saves:3,fonts:["Arial","Arial-Bold","Helvetica"],dupFonts:["Arial"]},
+     fields:{periode:"2026-10",siret:"81234560100025",brut:3200,netAvantImpot:2750,pas:0,netAPayer:2750,netImposable:2810,cumulBrut:27400,nir:"1 85 03 75 123 456 41",ape:true,ccn:true}}
+  ];
+  renderAll();
+}
+
+/* ---------- Événements ---------- */
+const status=t=>$("#status").textContent=t;
+function clearExample(){if(example){example=false;bulletins=[];}}
+async function handleFiles(files){
+  files=[...files]; if(!files.length)return;
+  clearExample();
+  for(const file of files){
+    status(`Analyse de ${file.name}…`);
+    const b={id:++uid,name:file.name,meta:null,fields:{}};
+    if(file.type.startsWith("image/")){b.source="image";}
+    else{
+      try{const r=await readPdf(file);b.source="pdf";b.meta=r.meta;b.fields=r.fields;}
+      catch(e){b.source=(e&&e.name==="PasswordException")?"locked":"manuel";if(b.source==="manuel")b.name+=" (illisible)";}
+    }
+    bulletins.push(b);
+  }
+  status(`${files.length} fichier${files.length>1?"s":""} analysé${files.length>1?"s":""}. Vérifiez les valeurs lues si un contrôle paraît faux.`);
+  renderAll();
+}
+$("#pick").addEventListener("click",()=>$("#file").click());
+$("#file").addEventListener("change",e=>{handleFiles(e.target.files);e.target.value="";});
+$("#manual").addEventListener("click",()=>{clearExample();bulletins.push({id:++uid,name:"Bulletin saisi à la main",source:"manuel",meta:null,fields:{}});renderAll();const c=$("#card-"+uid);c&&c.scrollIntoView({behavior:"smooth",block:"start"});});
+const drop=$("#drop");
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
+drop.addEventListener("drop",e=>handleFiles(e.dataTransfer.files));
+$("#list").addEventListener("input",e=>{
+  const t=e.target; if(!t.dataset.k)return;
+  const b=bulletins.find(x=>x.id===+t.dataset.b); if(!b)return;
+  b.fields[t.dataset.k]=t.value;
+  cardResult(b); renderSummary();
+});
+$("#list").addEventListener("click",e=>{
+  const id=e.target.dataset&&e.target.dataset.rm; if(!id)return;
+  bulletins=bulletins.filter(b=>b.id!==+id); if(!bulletins.length)example=false;
+  renderAll();
+});
+$("#avis").addEventListener("input",renderSummary);
+
+if(!window.pdfjsLib) status("Le lecteur PDF n'a pas pu se charger. Rechargez la page, ou utilisez la saisie manuelle.");
+loadExample();
+})();
+</script>
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));}
+</script>
+</body>
+</html>
