@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Vérificateur de bulletins</title>
-<meta name="description" content="Contrôle des bulletins de paie d'un dossier locataire : calculs, numéros officiels, fichier.">
+<meta name="description" content="Contrôle des bulletins de paie d'un dossier locataire : calculs ligne par ligne, totaux, numéros officiels, fichier.">
 <meta name="theme-color" content="#1C4D86" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0E141B" media="(prefers-color-scheme: dark)">
 <link rel="manifest" id="manifest-link">
@@ -130,7 +130,7 @@ dl.file dt{color:var(--muted)} dl.file dd{margin:0;min-width:0;word-break:break-
 <div class="wrap">
   <header>
     <h1>Vérificateur de bulletins de paie</h1>
-    <p class="lede">Déposez les bulletins du candidat. L'outil relit les montants, refait les calculs et contrôle les numéros officiels, puis vous dit en clair ce qui tient et ce qui ne tient pas. Rien ne quitte votre appareil.</p>
+    <p class="lede">Déposez les bulletins du candidat. L'outil relit les montants, refait chaque ligne (base × taux = montant), les totaux et les numéros officiels, puis vous dit en clair ce qui tient et ce qui ne tient pas. Rien ne quitte votre appareil.</p>
   </header>
 
   <section class="drop" id="drop" aria-label="Déposer des bulletins">
@@ -176,30 +176,44 @@ dl.file dt{color:var(--muted)} dl.file dd{margin:0;min-width:0;word-break:break-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <script>
-(function(){
+/* Moteur d'analyse — Vérificateur de bulletins (pur, testable sans DOM) */
+window.VB=(function(){
 "use strict";
-const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const eur=n=>n==null||isNaN(n)?"—":n.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
 const pct=n=>(n*100).toLocaleString("fr-FR",{maximumFractionDigits:1})+" %";
 const fdate=d=>d?d.toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})+" à "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"—";
 const MOIS=["JANVIER","FEVRIER","MARS","AVRIL","MAI","JUIN","JUILLET","AOUT","SEPTEMBRE","OCTOBRE","NOVEMBRE","DECEMBRE"];
 const moisLabel=p=>{if(!p)return "";const [y,m]=p.split("-").map(Number);return new Date(y,m-1,1).toLocaleDateString("fr-FR",{month:"long",year:"numeric"});};
+const norm=s=>s.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase();
 
-if(window.pdfjsLib && !window.pdfjsWorker){
-  try{pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob(['importScripts("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js")'],{type:"text/javascript"}));}catch(e){}
+/* ---------- Nombres ----------
+   Formats rencontrés : « 1 987,65 » (Silae, Sage…), « 198765 » = 1 987,65 (ADP, décimales implicites),
+   « 1703 38 » = 1 703,38 (pied de page ADP), « 453- » = montant retenu (négatif). */
+const TOK=/-?\d{1,3}(?:[   .]\d{3})+,\d{2}-?|-?\d+,\d{2}-?|\d+ {1,3}\d{2}(?![\d,])|\d+-?/g;
+const CAL=/(\s+[LMJVSD]\s+\d{2}(?:\s+\d{1,2}\s+\d{2})*)\s*$/; // colonne calendrier ADP en fin de ligne
+function tokens(line,implied){
+  const out=[]; let m; TOK.lastIndex=0;
+  while((m=TOK.exec(line))){
+    let raw=m[0], neg=false, v;
+    if(raw.endsWith("-")){neg=true;raw=raw.slice(0,-1);}
+    if(raw.startsWith("-")){neg=true;raw=raw.slice(1);}
+    if(raw.includes(",")) v=parseFloat(raw.replace(/[   .]/g,"").replace(",","."));
+    else if(/ /.test(raw)) v=parseFloat(raw.replace(/ +/,"."));
+    else{ v=parseInt(raw,10); if(implied) v=v/100; }
+    if(isNaN(v))continue;
+    const bare=!/[, ]/.test(m[0]);
+    if(bare&&raw.length<=2)continue; // codes : (1), tranche 1, etc.
+    out.push({v:neg?-v:v,raw:m[0],idx:m.index,bare});
+  }
+  return out;
 }
-
-/* ---------- Nombres ---------- */
-const AMT=/-?\d{1,3}(?:[   .]\d{3})+,\d{2}(?!\d)|-?\d+[.,]\d{2}(?!\d)/g;
 function parseAmt(s){
   if(s==null)return null; if(typeof s==="number")return s; s=String(s).trim(); if(!s)return null;
   s=s.replace(/[   €]/g,"");
   if(s.includes(",")) s=s.replace(/\./g,"").replace(",",".");
   const n=parseFloat(s); return isNaN(n)?null:n;
 }
-const amountsIn=line=>(line.match(AMT)||[]).map(parseAmt).filter(n=>n!=null);
-const norm=s=>s.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase();
 
 /* ---------- Numéros officiels ---------- */
 function luhn(d){let s=0;for(let i=0;i<d.length;i++){let n=+d[d.length-1-i];if(i%2){n*=2;if(n>9)n-=9;}s+=n;}return s%10===0;}
@@ -220,42 +234,69 @@ function nirState(s){
   return 97-Number(BigInt(body)%97n)===+s.slice(13)?"ok":"bad";
 }
 
-/* ---------- Extraction des champs ---------- */
-// Sur une ligne « Salaire brut  2 650,00  23 850,00 », le 1er montant est le mois, le 2e (plus grand) le cumul.
-function findLine(lines,include,exclude){
-  for(const line of lines){
-    const m=include.exec(line); if(!m)continue;
+/* ---------- Extraction ---------- */
+const COTIS_KW=/CSG|CRDS|RETRAITE|MALADIE|CHOMAGE|VIEILLESSE|PREVOYANCE|SECURITE SOCIALE PLAF|COMPLEMENTAIRE/;
+function prepLines(rawLines){
+  const lines=rawLines.map(l=>norm(l).replace(CAL,"").replace(/\s+/g," ").trim()).filter(Boolean);
+  let comma=0,bare=0;
+  for(const l of lines){ if(!COTIS_KW.test(l))continue; for(const t of tokens(l,false)){ if(/,/.test(t.raw))comma++; else if(t.raw.replace("-","").length>=3)bare++; } }
+  const implied=bare>comma*2&&bare>=4;
+  return {lines,implied};
+}
+// Cherche la première ligne dont le libellé correspond ; renvoie les montants qui suivent le libellé.
+// Si la ligne n'a pas de montant mais que la suivante n'est faite que de nombres, on la prend.
+function findRow(ctx,include,exclude,min=1){
+  const {lines,implied}=ctx;
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i]; const m=include.exec(line); if(!m)continue;
     if(exclude&&exclude.test(line))continue;
-    const a=amountsIn(line.slice(m.index+m[0].length)).filter(n=>Math.abs(n)>=1);
-    if(a.length)return {mois:a[0],cumul:a.length>1&&a[a.length-1]>=a[0]?a[a.length-1]:null};
+    let a=tokens(line.slice(m.index+m[0].length),implied).map(t=>t.v).filter(n=>Math.abs(n)>=min);
+    if(!a.length&&i+1<lines.length){
+      const nx=lines[i+1]; const tk=tokens(nx,implied);
+      if(tk.length&&nx.replace(TOK,"").trim()==="") a=tk.map(t=>t.v).filter(n=>Math.abs(n)>=min);
+    }
+    if(a.length)return {a,line,i};
   }
   return null;
 }
+const moisCumul=r=>r?{mois:r.a[0],cumul:r.a.length>1&&r.a[r.a.length-1]>=r.a[0]?r.a[r.a.length-1]:null}:{mois:null,cumul:null};
+
 function extractFields(rawLines){
-  const lines=rawLines.map(norm);
-  const all=lines.join(" | ");
+  const ctx=prepLines(rawLines); const {lines,implied}=ctx; const all=lines.join(" | ");
   const f={};
-  const brut=findLine(lines,/SALAIRE BRUT|TOTAL BRUT|BRUT TOTAL|BRUT SOCIAL|REMUNERATION BRUTE/,/^CUMUL|ANNUEL|ABATT/)||findLine(lines,/\bBRUT\b/,/^CUMUL|ANNUEL|BASE|PLAFOND|ABATT|IMPOSABLE/);
-  f.brut=brut?brut.mois:null; f.cumulBrut=brut?brut.cumul:null;
-  const nai=findLine(lines,/NET A PAYER AVANT IMPOT|NET AVANT IMPOT|NET A PAYER AVANT PRELEVEMENT|AVANT IMPOT SUR LE REVENU/,/^CUMUL/);
-  f.netAvantImpot=nai?nai.mois:null;
-  const nap=findLine(lines,/NET A PAYER|NET PAYE|NET VERSE|NET A VERSER|MONTANT NET PAYE/,/AVANT|^CUMUL/);
-  f.netAPayer=nap?nap.mois:null;
-  const nimp=findLine(lines,/NET IMPOSABLE|NET FISCAL/,/^CUMUL/);
-  f.netImposable=nimp?nimp.mois:null;
-  const pas=findLine(lines,/IMPOT SUR LE REVENU PRELEVE|PRELEVEMENT A LA SOURCE|IMPOT SUR LE REVENU/,/AVANT|^CUMUL|NET A PAYER|NET IMPOSABLE|TAUX NON/);
-  f.pas=pas?Math.abs(pas.mois):null;
-  if(f.cumulBrut==null){
-    for(let i=0;i<lines.length;i++){
-      if(!/CUMUL/.test(lines[i]))continue;
-      const block=lines.slice(i,i+4).join(" | ");
-      const m=/BRUT(?: SOCIAL| FISCAL)?[^0-9\-]{0,40}/.exec(block);
-      if(m){const a=amountsIn(block.slice(m.index+m[0].length)).filter(n=>n>=1);if(a.length){f.cumulBrut=a[0];break;}}
-    }
+  let r=findRow(ctx,/REMUNERATION BRUTE|SALAIRE BRUT|TOTAL BRUT|BRUT TOTAL|BRUT SOCIAL|TOTAL GAINS? BRUTS?/,/^CUMUL|ANNUEL|ABATT|IMPOTS/)
+      ||findRow(ctx,/\bBRUT\b/,/^CUMUL|ANNUEL|BASE|PLAFOND|ABATT|IMPOSABLE|IMPOTS|BRUT DU MOIS/);
+  let mc=moisCumul(r); f.brut=mc.mois; f.cumulBrut=mc.cumul; f._brutIdx=r?r.i:-1;
+  r=findRow(ctx,/NET A PAYER AVANT IMPOT|NET AVANT IMPOT|NET A PAYER AVANT PRELEVEMENT|AVANT IMPOT SUR LE REVENU/,/^CUMUL/);
+  f.netAvantImpot=r?r.a[0]:null;
+  r=findRow(ctx,/NET A PAYER|NET PAYE|NET VERSE|NET A VERSER|MONTANT NET PAYE/,/AVANT|^CUMUL/);
+  f.netAPayer=r?r.a[0]:null;
+  r=findRow(ctx,/NET IMPOSABLE|NET FISCAL/,/^CUMUL|HS\/HC|EXONER/);
+  f.netImposable=r?r.a[0]:null;
+  // Impôt : d'abord une ligne « base taux montant », sinon une ligne simple
+  const pasInc=/IMPOT SUR LE REVENU PRELEVE|PRELEVEMENT A LA SOURCE|IMPOT SUR LE REVENU/, pasExc=/AVANT|^CUMUL|NET A PAYER|NET IMPOSABLE|TAUX NON|TAUX PERSO|CSG|CRDS/;
+  f.pas=null; f._pasTaux=null; f._pasBase=null;
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i]; const m=pasInc.exec(l); if(!m||pasExc.test(l))continue;
+    const tk=tokens(l.slice(m.index+m[0].length),implied).map(t=>t.v);
+    if(tk.length>=3&&tk[1]>=0&&tk[1]<=60){f._pasBase=tk[0];f._pasTaux=tk[1];f.pas=Math.abs(tk[2]);break;}
   }
+  if(f.pas==null){r=findRow(ctx,pasInc,pasExc,0.01);if(r)f.pas=Math.abs(r.a[0]);}
+  r=findRow(ctx,/COTISAT\.? ?SALARIALES|TOTAL (DES )?COTISATIONS( SALARIALES)?|TOTAL RETENUES|TOTAL CHARGES SALARIALES|TOTAL PART SALARIALE/,/PATRONAL|EMPLOYEUR/);
+  f.cotSal=r?Math.abs(r.a[0]):null; f._cotIdx=r?r.i:-1;
+  r=findRow(ctx,/INDEM\.? ?NON SOUMISES|TOTAL NON SOUMIS|ELEMENTS NON SOUMIS|NET NON SOUMIS/,null,0.01);
+  f.indemNS=r?r.a[0]:null;
+  r=findRow(ctx,/AUTRES RETENUES|TOTAL RETENUES DIVERSES/,/COTIS/,0.01);
+  f.retenues=r?Math.abs(r.a[0]):null;
+  r=findRow(ctx,/TAUX HORAIRE|TAUX MOIS|TAUX HOR\b|SALAIRE HORAIRE/,/HS|SUPPL/);
+  f.tauxHoraire=r?r.a[0]:null;
+  r=findRow(ctx,/HRES TRAV\.?MOIS|HEURES TRAVAILLEES|HORAIRE MENSUEL|HEURES PAYEES|NB HEURES|HORAIRE DU MOIS|HEURES DU MOIS/,/SUPPL|THEO|HS/);
+  f.heures=r?r.a[0]:null;
+  r=findRow(ctx,/SALAIRE DE BASE|SALAIRE BASE|SALAIRE MENSUEL|APPOINTEMENTS/,/CUMUL/);
+  f.salaireBase=r?r.a[r.a.length-1]:null;
   let m=/SIRET[^0-9]{0,15}((?:\d[ . ]?){13}\d)/.exec(all)||/\b(\d{3} ?\d{3} ?\d{3} ?\d{5})\b/.exec(all);
   f.siret=m?m[1].replace(/\D/g,""):"";
-  m=/\b([12378]) ?(\d{2}) ?(\d{2}) ?(\d{2}|2A|2B) ?(\d{3}) ?(\d{3}) ?(\d{2})\b/.exec(all);
+  m=/(?:SECURITE SOCIALE|N° SS|NIR|N° SECU)[^0-9]{0,12}([12378]) ?(\d{2}) ?(\d{2}) ?(\d{2}|2A|2B) ?(\d{3}) ?(\d{3}) ?(\d{2})\b/.exec(all)||/\b([12378]) ?(\d{2}) ?(\d{2}) ?(\d{2}|2A|2B) ?(\d{3}) ?(\d{3}) ?(\d{2})\b/.exec(all);
   f.nir=m?m.slice(1).join(" "):"";
   f.periode="";
   m=/PERIODE[^|]{0,40}?(\d{2})[\/.](\d{2})[\/.](20\d{2})/.exec(all);
@@ -263,11 +304,223 @@ function extractFields(rawLines){
   if(!f.periode){m=new RegExp("("+MOIS.join("|")+")\\s+(20\\d{2})").exec(all);if(m)f.periode=m[2]+"-"+String(MOIS.indexOf(m[1])+1).padStart(2,"0");}
   if(!f.periode){m=/PERIODE[^|]{0,20}?\b(\d{2})\/(20\d{2})\b/.exec(all);if(m)f.periode=m[2]+"-"+m[1];}
   f.ape=/\b(APE|NAF)\b/.test(all);
-  f.ccn=/CONVENTION COLLECTIVE|CONV\.? COLL|IDCC/.test(all);
+  f.ccn=/CONVENTION\s+COLLECTIVE|CONV\.? COLL|IDCC/.test(all);
+  f._rows=tableRows(ctx,f);
   return f;
 }
 
-/* ---------- Lecture du PDF ---------- */
+/* Lignes du tableau : libellé + (base, taux, montant salarié[, montant employeur]) */
+const SKIP_ROW=/CUMUL|TOTAL|HEURES|HRES|CONGES|SOLDE|DU MOIS|PERIODE|DATE|MATRICULE|SIRET|SECURITE SOCIALE :|NET |BRUT|IBAN|BIC|TAUX PERSO|PLAFOND|EXONERATION|ALLEGEMENT|REDUCTION|VIREMENT|VERSE/;
+function tableRows(ctx,f){
+  const {lines,implied}=ctx; const rows=[];
+  const endIdx=lines.findIndex(l=>/NET A PAYER|NET SOCIAL|TOTAL VERSE/.test(l));
+  const stop=endIdx>0?endIdx:lines.length;
+  let start=lines.findIndex(l=>/SALAIRE DE BASE|SALAIRE BASE|SALAIRE MENSUEL|APPOINTEMENTS|SALAIRE BRUT|REMUNERATION|HEURES NORMALES/.test(l));
+  if(start<0)start=0;
+  f._implied=implied;
+  for(let i=start;i<stop;i++){
+    const l=lines[i]; const tk=tokens(l,implied); if(tk.length<1)continue;
+    const label=l.slice(0,tk[0].idx).replace(/[.*:()\d]+$/g,"").trim();
+    if(!label||label.length<3)continue;
+    const tot=/COTISAT\.? ?SALARIALES|TOTAL (DES )?COTISATIONS|TOTAL RETENUES|TOTAL CHARGES SALARIALES|REMUNERATION BRUTE|SALAIRE BRUT|TOTAL BRUT|BRUT TOTAL/.test(l);
+    rows.push({i,label,tk:tk.map(t=>t.v),line:l,gain:f._brutIdx<0||i<f._brutIdx,total:tot,skip:SKIP_ROW.test(l)});
+  }
+  return rows;
+}
+
+/* ---------- Analyse ----------
+   sev : bad (incohérence solide) · warn (à vérifier) · info · ok */
+const EDITORS=/photoshop|gimp|illustrator|inkscape|canva|pixelmator|affinity|paint\.net|pdfescape|sejda|smallpdf|ilovepdf|pdffiller|dochub|pdf candy|pdf2go|soda pdf|pdfsimpli|formswift|pdfelement|wondershare|pdf-xchange editor|foxit pdf editor/i;
+const OFFICE=/microsoft.{0,3}word|libreoffice|openoffice|google docs|\bwriter\b|\bpages\b/i;
+const EXCEL=/excel|calc\b|numbers/i;
+const PAYROLL=/silae|sage|cegid|\badp\b|payfit|quadra|\bebp\b|ciel|nibelis|meta4|peoplesphere|\bega\b|\bsap\b|workday|hr access|talentia|zadig|openpaye|isapaye|decidium|eurecia|lucca|cegedim|paie|payroll|teams rh|pegase|kelio|inexweb|listo|rue de la paye|gsi/i;
+// Taux salariaux légaux (régime général, 2025-2026)
+const LEGAL=[
+  {re:/(VIEILLESSE|SECURITE SOCIALE|RETRAITE).*DEPLAFONNEE|VIEILLESSE DEPLAF/, ok:[0.40,2.02,1.90], nom:"vieillesse déplafonnée (0,40 % salarié)"},
+  {re:/(VIEILLESSE|SECURITE SOCIALE|RETRAITE).*PLAFONNEE|VIEILLESSE PLAF|ASS\.? VIEILLESSE T/,  ok:[6.90,8.55], nom:"vieillesse plafonnée (6,90 % salarié)"},
+  {re:/CSG DEDUCTIBLE/, ok:[6.80], nom:"CSG déductible (6,80 %)"},
+  {re:/CSG.*NON DEDUCTIBLE|CSG\/CRDS|CRDS/, ok:[2.90,0.50,2.40], nom:"CSG/CRDS non déductible (2,90 %)"},
+  {re:/RETRAITE COMPLEMENTAIRE.*(T1|TRANCHE 1)|AGIRC.?ARRCO.*(T1|TRANCHE 1)|COMPLEMENTAIRE T1/, ok:[3.15,4.01,4.72,6.01], nom:"retraite complémentaire T1 (3,15 % ou 4,01 % avec CEG)"},
+  {re:/\bAPEC\b/, ok:[0.024,0.036], nom:"APEC (0,024 %)"},
+];
+const SMIC_H=11.88;
+const near=(a,b,tol)=>Math.abs(a-b)<=tol;
+
+function analyze(b){
+  const F={fichier:[],calculs:[],lignes:[],numeros:[]};
+  const add=(g,sev,t,d)=>F[g].push({sev,t,d});
+  const f=b.fields, m=b.meta;
+
+  /* --- Fichier --- */
+  if(b.source==="image") add("fichier","info","Photo ou scan","Impossible d'examiner le fichier. Les calculs se font sur les montants que vous saisissez.");
+  else if(b.source==="locked") add("fichier","warn","PDF protégé par mot de passe","Demandez une version non protégée, ou saisissez les montants à la main.");
+  else if(m){
+    const sw=[m.producer,m.creator,m.author].filter(Boolean).join(" · ");
+    if(!m.hasText) add("fichier","warn","Le PDF ne contient que des images","Un bulletin issu d'un logiciel de paie contient du texte sélectionnable. Ici il a été scanné, photographié ou converti. Demandez l'original.");
+    if(EDITORS.test(sw)) add("fichier","warn","Passé par un outil de retouche",`Le fichier indique « ${esc(sw)} ». Ces outils servent à modifier un PDF. Cela peut être innocent (fusion, masquage), mais demandez l'original.`);
+    else if(OFFICE.test(sw)&&!PAYROLL.test(sw)) add("fichier","warn","Créé avec un traitement de texte",`« ${esc(sw)} ». Les logiciels de paie n'utilisent pas Word ou Writer. Courant pour un faux fait maison.`);
+    else if(EXCEL.test(sw)&&!PAYROLL.test(sw)) add("fichier","info","Créé depuis un tableur",`« ${esc(sw)} ». Possible dans une très petite entreprise, mais facile à modifier.`);
+    else if(PAYROLL.test(sw)) add("fichier","ok","Produit par un logiciel de paie",`« ${esc(sw)} »`);
+    else if(sw) add("fichier","info","Logiciel d'origine",`« ${esc(sw)} ». Technologie générique : normal pour un bulletin téléchargé sur un portail RH.`);
+    else if(m.hasText) add("fichier","info","Logiciel d'origine non renseigné","Fréquent après un passage par un portail, un mail ou un outil de nettoyage.");
+    if(m.signed) add("fichier","ok","Signature électronique présente","Bon signe d'un coffre-fort ou d'un portail RH.");
+    if(m.created&&m.modified&&(m.modified-m.created)/1000>120){
+      const j=(m.modified-m.created)/86400000;
+      add("fichier",j>1&&EDITORS.test(sw)?"warn":"info","Réenregistré après sa création",`Créé le ${fdate(m.created)}, modifié le ${fdate(m.modified)}. Normal pour un portail ou un coffre-fort ; à surveiller si le reste cloche.`);
+    }
+    if(m.saves>2) add("fichier","info","Plusieurs versions empilées",`${m.saves} enregistrements successifs. Peut venir d'une signature ou d'un simple réenregistrement.`);
+  }
+
+  /* --- Numéros --- */
+  const ss=siretState(f.siret);
+  if(ss==="ok") add("numeros","ok","SIRET valide",`<span class="num">${esc(f.siret.replace(/(\d{3})(\d{3})(\d{3})(\d{5})/,"$1 $2 $3 $4"))}</span> · <a href="https://annuaire-entreprises.data.gouv.fr/etablissement/${esc(f.siret)}" target="_blank" rel="noopener">voir l'entreprise →</a>`);
+  else if(ss==="bad") add("numeros","bad","SIRET impossible",`<span class="num">${esc(f.siret)}</span> ne respecte pas la clé de contrôle. Soit il est inventé, soit mal recopié : vérifiez-le sur le bulletin.`);
+  else if(ss==="format") add("numeros","warn","SIRET incomplet",`« ${esc(f.siret)} » n'a pas 14 chiffres.`);
+  else add("numeros","info","SIRET non trouvé","Obligatoire sur un bulletin. Recopiez-le ci-dessus pour le contrôler.");
+  const ns=nirState(f.nir);
+  if(ns==="bad") add("numeros","bad","Numéro de sécurité sociale impossible","Sa clé (les 2 derniers chiffres) est fausse. Un numéro inventé a cette erreur ; un vrai, jamais.");
+  else if(ns==="ok") add("numeros","ok","Numéro de sécurité sociale cohérent","La clé de contrôle est juste.");
+  else if(ns==="masked") add("numeros","info","Numéro de sécurité sociale masqué","Le candidat a le droit de le masquer.");
+
+  /* --- Calculs d'ensemble --- */
+  const brut=parseAmt(f.brut), nAI=parseAmt(f.netAvantImpot), nImp=parseAmt(f.netImposable), pas=parseAmt(f.pas), cum=parseAmt(f.cumulBrut);
+  const cot=parseAmt(f.cotSal), indem=parseAmt(f.indemNS)||0, ret=parseAmt(f.retenues)||0;
+  let nAP=parseAmt(f.netAPayer);
+  let netRef=nAI, refLabel="net avant impôt";
+  if(netRef==null&&nAP!=null&&pas!=null){netRef=nAP+pas;refLabel="net à payer + impôt";}
+  if(netRef==null&&nAP!=null){netRef=nAP;refLabel="net à payer";}
+  if(brut!=null&&netRef!=null&&brut>0){
+    const r=netRef/brut;
+    if(r>1.0) add("calculs","bad","Le net dépasse le brut",`${eur(netRef)} net pour ${eur(brut)} brut. Impossible, sauf remboursement exceptionnel : vérifiez d'abord que les deux montants sont bien lus.`);
+    else if(r>0.86) add("calculs","warn","Très peu de cotisations",`Le ${refLabel} fait ${pct(r)} du brut. Un salarié du privé est en général entre 75 et 82 %. Possible pour un apprenti ou certains contrats aidés.`);
+    else if(r<(nAI==null&&pas==null?0.58:0.66)) add("calculs","warn","Beaucoup de retenues",`Le ${refLabel} ne fait que ${pct(r)} du brut. Saisie sur salaire, acompte, mutuelle chère… ou montant mal lu.`);
+    else add("calculs","ok","Rapport net / brut normal",`${pct(r)} du brut (${refLabel} ${eur(netRef)} pour ${eur(brut)} brut).`);
+  } else add("calculs","info","Brut ou net manquant","Renseignez au moins le salaire brut et le net à payer pour vérifier les calculs.");
+  if(brut!=null&&cot!=null){
+    const exp=brut-cot+indem-ret; const ref=nAI??nAP;
+    if(ref!=null){
+      const gap=Math.abs(exp-ref);
+      if(gap>1.01) add("calculs",gap>brut*0.03?"bad":"warn","Brut − cotisations ≠ net",`${eur(brut)} − ${eur(cot)} de cotisations${indem?` + ${eur(indem)} non soumis`:""}${ret?` − ${eur(ret)} de retenues`:""} = ${eur(exp)}, mais le bulletin indique ${eur(ref)} (écart ${eur(gap)}). Un acompte ou une indemnité non lue peut l'expliquer ; sinon, le net a été modifié.`);
+      else add("calculs","ok","Brut − cotisations = net",`${eur(brut)} − ${eur(cot)}${indem?` + ${eur(indem)}`:""}${ret?` − ${eur(ret)}`:""} = ${eur(ref)}.`);
+    }
+  }
+  if(nAI!=null&&pas!=null&&nAP!=null){
+    const gap=Math.abs(nAI-pas-nAP);
+    if(gap>1.01){
+      const tauxOk=f._pasTaux!=null&&f._pasBase&&near(f._pasBase*f._pasTaux/100,nAI-nAP,1);
+      add("calculs",tauxOk?"warn":"bad","Le net à payer ne tombe pas juste",`${eur(nAI)} − ${eur(pas)} d'impôt devrait donner ${eur(nAI-pas)}. Le bulletin indique ${eur(nAP)} (écart ${eur(gap)}). Vérifiez la valeur « impôt prélevé » : si elle est juste, un logiciel de paie ne fait pas cette erreur.`);
+    } else add("calculs","ok","Impôt correctement déduit",`${eur(nAI)} − ${eur(pas)} = ${eur(nAP)}.`);
+  }
+  if(f._pasTaux!=null&&f._pasBase&&pas!=null){
+    const exp=f._pasBase*f._pasTaux/100;
+    if(!near(exp,pas,Math.max(0.02,exp*0.01))) add("calculs","bad","Impôt ≠ base × taux",`${eur(f._pasBase)} × ${f._pasTaux.toLocaleString("fr-FR")} % = ${eur(exp)}, mais la ligne indique ${eur(pas)}.`);
+    else if(pas>0) add("calculs","ok","Impôt = base × taux",`${eur(f._pasBase)} × ${f._pasTaux.toLocaleString("fr-FR")} % = ${eur(pas)}.`);
+  }
+  if(nImp!=null&&(nAI??nAP)!=null){
+    const base=nAI??nAP; const r=nImp/base;
+    if(r<0.95||r>1.2) add("calculs","warn","Net imposable étonnant",`${eur(nImp)} imposable pour ${eur(base)} net. D'habitude le net imposable dépasse le net de 2 à 8 %.`);
+    else add("calculs","ok","Net imposable cohérent",`${pct(Math.max(r-1,0))} au-dessus du net, comme attendu.`);
+  }
+  if(f.tauxHoraire!=null&&f.heures!=null&&f.salaireBase!=null){
+    const th=parseAmt(f.tauxHoraire),h=parseAmt(f.heures),sb=parseAmt(f.salaireBase); const exp=th*h;
+    if(th>0&&h>0&&sb>0){
+      if(!near(exp,sb,Math.max(1,exp*0.005))) add("calculs","warn","Taux horaire × heures ≠ salaire de base",`${th.toLocaleString("fr-FR")} € × ${h.toLocaleString("fr-FR")} h = ${eur(exp)}, mais le salaire de base indiqué est ${eur(sb)}.`);
+      else add("calculs","ok","Taux horaire × heures = salaire de base",`${th.toLocaleString("fr-FR")} € × ${h.toLocaleString("fr-FR")} h = ${eur(sb)}.`);
+    }
+    if(th>0&&th<SMIC_H) add("calculs","warn","Taux horaire sous le SMIC",`${th.toLocaleString("fr-FR")} € de l'heure, sous le minimum légal (${SMIC_H.toLocaleString("fr-FR")} €), sauf apprenti ou contrat particulier.`);
+  }
+  if(f.periode){
+    const [y,mo]=f.periode.split("-").map(Number);
+    const months=(new Date().getFullYear()-y)*12+(new Date().getMonth()+1-mo);
+    if(months<0) add("calculs","bad","Mois dans le futur",`Bulletin de ${moisLabel(f.periode)}, alors que nous sommes avant.`);
+    else if(months>4) add("calculs","info","Bulletin ancien",`${moisLabel(f.periode)}. Demandez les 3 derniers mois.`);
+    if(cum!=null&&brut!=null){
+      if(cum+1<brut) add("calculs","bad","Cumul annuel inférieur au mois",`Le cumul depuis janvier (${eur(cum)}) ne peut pas être inférieur au brut du mois (${eur(brut)}).`);
+      else if(cum>brut*mo*1.8+1) add("calculs","warn","Cumul annuel trop élevé",`${eur(cum)} après ${mo} mois, soit bien plus que ${mo} × ${eur(brut)}. Prime exceptionnelle, ou chiffre inventé.`);
+      else add("calculs","ok","Cumul annuel plausible",`${eur(cum)} depuis janvier pour ${eur(brut)} ce mois-ci.`);
+    }
+  }
+
+  /* --- Ligne par ligne --- */
+  const rows=f._rows||[];
+  let nLineBad=0, sumCot=0, nCot=0, sumGain=0, nGain=0;
+  for(const r of rows){
+    if(r.total)continue;
+    const t=r.tk;
+    const hasTriplet=t.length>=3&&t[0]>0&&t[1]>0&&t[1]<=100&&t[2]!==0;
+    if(hasTriplet&&!r.skip){
+      const base=t[0],mont=Math.abs(t[2]);
+      // Certains logiciels (ADP) impriment le taux avec 3 décimales implicites : on essaie les deux lectures.
+      const cands=f._implied?[t[1],t[1]/10]:[t[1]];
+      let taux=cands[0], ok=false, e1=base*taux/100, e2=base*taux;
+      for(const c of cands){
+        const a1=base*c/100,a2=base*c;
+        if(near(mont,a1,Math.max(0.02,a1*0.006))||near(mont,a2,Math.max(0.02,a2*0.006))){ok=true;taux=c;e1=a1;e2=a2;break;}
+      }
+      if(!ok){nLineBad++;add("lignes","bad",`« ${esc(r.label)} » : base × taux ≠ montant`,`${base.toLocaleString("fr-FR")} × ${taux.toLocaleString("fr-FR")} devrait donner ${eur(e1)} (en %) ou ${eur(e2)} (en € par unité), mais la ligne indique ${eur(mont)}. Erreur de paie ou chiffre modifié à la main.`);}
+      if(!r.gain){
+        for(const L of LEGAL){ if(L.re.test(r.label)){ if(!cands.some(c=>L.ok.some(v=>near(v,c,0.011)))) add("lignes","warn",`Taux inhabituel : « ${esc(r.label)} »`,`${taux.toLocaleString("fr-FR")} % au lieu du taux légal ${L.nom}.`); break; } }
+      } else if(!/SALAIRE DE BASE|SALAIRE BASE|SALAIRE MENSUEL|APPOINTEMENTS|HEURES NORMALES/.test(r.label)&&brut&&mont>=brut*0.03){
+        add("lignes","info",`Élément variable : « ${esc(r.label)} »`,`${base.toLocaleString("fr-FR")} × ${taux.toLocaleString("fr-FR")} = ${eur(mont)}. Le calcul est juste, mais vérifiez que cette prime existe bien et que la quantité est plausible (comparez avec les autres mois).`);
+      }
+    }
+    if(!r.gain&&f._cotIdx>0&&r.i<f._cotIdx&&hasTriplet&&!r.skip){sumCot+=Math.abs(t[2]);nCot++;}
+    if(r.gain&&!r.skip&&(t.length===1||hasTriplet)){sumGain+=t.length===1?t[0]:t[2];nGain++;}
+  }
+  if(nLineBad===0&&rows.some(r=>r.tk.length>=3)) add("lignes","ok","Chaque ligne respecte base × taux = montant",`${rows.filter(r=>r.tk.length>=3&&!r.skip&&!r.total).length} lignes vérifiées.`);
+  if(cot!=null&&nCot>=3){
+    if(!near(sumCot,cot,Math.max(0.05,cot*0.002))) add("lignes",sumCot<cot?"bad":"warn","Les cotisations ne s'additionnent pas",`La somme des lignes salariales fait ${eur(sumCot)}, mais le total indiqué est ${eur(cot)}. Une ligne a été modifiée sans refaire le total, ou une ligne n'a pas été lue.`);
+    else add("lignes","ok","Somme des cotisations = total",`${nCot} lignes, ${eur(cot)}.`);
+  }
+  if(brut!=null&&nGain>=2){
+    if(!near(sumGain,brut,Math.max(0.05,brut*0.002))) add("lignes","warn","Les gains ne s'additionnent pas au brut",`La somme des lignes de salaire et primes lues fait ${eur(sumGain)}, pour un brut de ${eur(brut)}. Vérifiez qu'aucune ligne n'a été mal lue.`);
+    else add("lignes","ok","Somme des gains = brut",`${nGain} lignes, ${eur(brut)}.`);
+  }
+  return F;
+}
+function verdictOf(F){
+  const all=[...F.fichier,...F.calculs,...F.lignes,...F.numeros];
+  if(all.some(x=>x.sev==="bad"))return "bad";
+  if(all.some(x=>x.sev==="warn"))return "warn";
+  return "ok";
+}
+
+/* ---------- Recoupements entre bulletins ---------- */
+function cross(list,avis){
+  const out=[]; const add=(sev,t,d)=>out.push({sev,t,d});
+  const sirets=[...new Set(list.map(b=>(b.fields.siret||"").replace(/\D/g,"")).filter(s=>s.length===14))];
+  if(sirets.length>1) add("warn","SIRET différents d'un bulletin à l'autre",`${sirets.map(s=>`<span class="num">${s}</span>`).join(" et ")}. Un même employeur garde le même numéro, sauf changement d'établissement.`);
+  const dated=list.filter(b=>b.fields.periode).sort((a,b)=>a.fields.periode.localeCompare(b.fields.periode));
+  for(let i=1;i<dated.length;i++){
+    const A=dated[i-1],B=dated[i];
+    const [ya,ma]=A.fields.periode.split("-").map(Number),[yb,mb]=B.fields.periode.split("-").map(Number);
+    if(A.fields.periode===B.fields.periode){add("warn","Deux bulletins pour le même mois",`${esc(A.name)} et ${esc(B.name)} : ${moisLabel(A.fields.periode)}.`);continue;}
+    const cA=parseAmt(A.fields.cumulBrut),cB=parseAmt(B.fields.cumulBrut),bB=parseAmt(B.fields.brut),bA=parseAmt(A.fields.brut);
+    if(ya===yb&&mb===ma+1&&cA!=null&&cB!=null&&bB!=null){
+      const exp=cA+bB;
+      if(Math.abs(exp-cB)>1.01) add("bad","Les cumuls ne s'enchaînent pas",`Cumul de ${moisLabel(A.fields.periode)} : ${eur(cA)}. Avec ${eur(bB)} de brut en ${moisLabel(B.fields.periode)}, on attend ${eur(exp)} ; le bulletin indique ${eur(cB)}. Erreur typique d'un bulletin modifié sans refaire les cumuls.`);
+      else add("ok","Les cumuls s'enchaînent bien",`${moisLabel(A.fields.periode)} → ${moisLabel(B.fields.periode)}.`);
+    }
+    if(bA&&bB){const v=Math.abs(bB-bA)/bA; if(v>0.3) add("info","Le brut varie beaucoup",`${eur(bA)} puis ${eur(bB)} (${pct(v)}). Prime ou heures supplémentaires possibles.`);}
+    const gains=b=>(b.fields._rows||[]).filter(r=>r.gain&&!r.skip&&!r.total&&(r.tk.length===1||r.tk.length>=3)).map(r=>({label:r.label.replace(/\s+/g," "),v:Math.abs(r.tk.length===1?r.tk[0]:r.tk[2])}));
+    const gA=gains(A),gB=gains(B);
+    for(const g of gB){
+      const prev=gA.find(x=>x.label===g.label);
+      if(!prev&&g.v>=20) add("info",`Nouvelle ligne en ${moisLabel(B.fields.periode)} : « ${esc(g.label)} »`,`${eur(g.v)}, absente en ${moisLabel(A.fields.periode)}. Vérifiez qu'elle est justifiée.`);
+      else if(prev&&prev.v>0&&Math.abs(g.v-prev.v)/prev.v>0.5&&Math.abs(g.v-prev.v)>=20) add("info",`« ${esc(g.label)} » change beaucoup`,`${eur(prev.v)} en ${moisLabel(A.fields.periode)}, ${eur(g.v)} en ${moisLabel(B.fields.periode)}.`);
+    }
+  }
+  const imps=list.map(b=>parseAmt(b.fields.netImposable)).filter(v=>v!=null);
+  if(avis&&imps.length){
+    const annual=imps.reduce((a,v)=>a+v,0)/imps.length*12; const r=annual/avis;
+    if(r>1.35) add("warn","Bulletins bien au-dessus de l'avis d'imposition",`Environ ${eur(annual)} par an d'après les bulletins, contre ${eur(avis)} déclarés. Augmentation possible, à justifier (contrat, avenant).`);
+    else if(r<0.7) add("warn","Bulletins bien en dessous de l'avis",`Environ ${eur(annual)} par an contre ${eur(avis)} déclarés.`);
+    else add("ok","Revenus cohérents avec l'avis d'imposition",`Environ ${eur(annual)} par an contre ${eur(avis)} déclarés.`);
+  }
+  return out;
+}
+
+/* ---------- Lecture du PDF (navigateur) ---------- */
 function pdfDate(s){
   if(!s)return null;
   const m=/D:(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?([Z+\-])?(\d{2})?'?(\d{2})?/.exec(s);
@@ -277,25 +530,9 @@ function pdfDate(s){
   if(m[7]==="Z")iso+="Z"; else if(m[7]&&m[8])iso+=`${m[7]}${m[8]}:${m[9]||"00"}`;
   const dt=new Date(iso); return isNaN(dt)?null:dt;
 }
-async function readPdf(file){
-  const buf=new Uint8Array(await file.arrayBuffer());
-  const raw=new TextDecoder("latin1").decode(buf);
-  const meta={pages:0,hasText:false,producer:"",creator:"",created:null,modified:null};
-  meta.linearized=/\/Linearized/.test(raw.slice(0,2048));
-  meta.eof=(raw.match(/%%EOF/g)||[]).length;
-  meta.saves=Math.max(1,meta.eof-(meta.linearized?1:0));
-  meta.signed=/\/Type\s*\/Sig\b|\/ByteRange/.test(raw);
-  const fonts=new Set();
-  for(const fm of raw.matchAll(/\/BaseFont\s*\/([A-Za-z0-9+\-_,#.]+)/g))fonts.add(fm[1].replace(/^[A-Z]{6}\+/,""));
-  meta.fonts=[...fonts];
-  const pdf=await pdfjsLib.getDocument({data:buf.slice(),isEvalSupported:false}).promise;
-  meta.pages=pdf.numPages;
-  try{const md=await pdf.getMetadata();const i=md.info||{};
-    meta.producer=i.Producer||"";meta.creator=i.Creator||"";meta.created=pdfDate(i.CreationDate);meta.modified=pdfDate(i.ModDate);
-    if(md.metadata){try{const x=md.metadata.getAll();meta.producer=meta.producer||x["pdf:producer"]||"";meta.creator=meta.creator||x["xmp:creatortool"]||"";}catch(e){}}
-  }catch(e){}
+async function pdfLines(pdf,maxPages=4){
   const lines=[];
-  for(let p=1;p<=Math.min(pdf.numPages,4);p++){
+  for(let p=1;p<=Math.min(pdf.numPages,maxPages);p++){
     const page=await pdf.getPage(p);
     const tc=await page.getTextContent();
     const rows=[];
@@ -309,100 +546,42 @@ async function readPdf(file){
     rows.sort((a,b)=>b.y-a.y);
     for(const r of rows){r.items.sort((a,b)=>a.x-b.x);lines.push(r.items.map(i=>i.s.trim()).join("  "));}
   }
+  return lines;
+}
+async function readPdf(file,pdfjsLib){
+  const buf=new Uint8Array(await file.arrayBuffer());
+  const raw=new TextDecoder("latin1").decode(buf);
+  const meta={pages:0,hasText:false,producer:"",creator:"",author:"",created:null,modified:null};
+  meta.linearized=/\/Linearized/.test(raw.slice(0,2048));
+  meta.eof=(raw.match(/%%EOF/g)||[]).length;
+  meta.saves=Math.max(1,meta.eof-(meta.linearized?1:0));
+  meta.signed=/\/Type\s*\/Sig\b|\/ByteRange/.test(raw);
+  const fonts=new Set();
+  for(const fm of raw.matchAll(/\/BaseFont\s*\/([A-Za-z0-9+\-_,#.]+)/g))fonts.add(fm[1].replace(/^[A-Z]{6}\+/,""));
+  meta.fonts=[...fonts];
+  const pdf=await pdfjsLib.getDocument({data:buf.slice(),isEvalSupported:false}).promise;
+  meta.pages=pdf.numPages;
+  try{const md=await pdf.getMetadata();const i=md.info||{};
+    meta.producer=i.Producer||"";meta.creator=i.Creator||"";meta.author=i.Author||"";meta.created=pdfDate(i.CreationDate);meta.modified=pdfDate(i.ModDate);
+    if(md.metadata){try{const x=md.metadata.getAll();meta.producer=meta.producer||x["pdf:producer"]||"";meta.creator=meta.creator||x["xmp:creatortool"]||"";}catch(e){}}
+  }catch(e){}
+  const lines=await pdfLines(pdf);
   meta.hasText=lines.join("").replace(/\s/g,"").length>40;
   return {meta,fields:extractFields(lines)};
 }
 
-/* ---------- Analyse ----------
-   sev : bad (incohérence solide) · warn (à vérifier) · info (simple information) · ok
-   Les signaux du fichier ne suffisent jamais, à eux seuls, à classer un bulletin « incohérent ». */
-const EDITORS=/photoshop|gimp|illustrator|inkscape|canva|pixelmator|affinity|paint\.net|pdfescape|sejda|smallpdf|ilovepdf|pdffiller|dochub|pdf candy|pdf2go|soda pdf|pdfsimpli|formswift|pdfelement|wondershare|pdf-xchange editor|foxit pdf editor/i;
-const OFFICE=/microsoft.{0,3}word|libreoffice|openoffice|google docs|\bwriter\b|\bpages\b/i;
-const EXCEL=/excel|calc\b|numbers/i;
-const PAYROLL=/silae|sage|cegid|\badp\b|payfit|quadra|\bebp\b|ciel|nibelis|meta4|peoplesphere|\bega\b|\bsap\b|workday|hr access|talentia|zadig|openpaye|isapaye|decidium|eurecia|lucca|cegedim|paie|payroll|teams rh|pegase|kelio|inexweb|listo|rue de la paye/i;
+return {esc,eur,pct,fdate,moisLabel,parseAmt,extractFields,analyze,verdictOf,cross,readPdf,siretState,nirState,tokens};
+})();
 
-function analyze(b){
-  const F={fichier:[],calculs:[],numeros:[]};
-  const add=(g,sev,t,d)=>F[g].push({sev,t,d});
-  const f=b.fields, m=b.meta;
-
-  /* --- Fichier --- */
-  if(b.source==="image") add("fichier","info","Photo ou scan","Impossible d'examiner le fichier. Les calculs ci-dessous se font sur les montants que vous saisissez.");
-  else if(b.source==="locked") add("fichier","warn","PDF protégé par mot de passe","Demandez une version non protégée, ou saisissez les montants à la main.");
-  else if(m){
-    const sw=(m.producer+" "+m.creator).trim();
-    if(!m.hasText) add("fichier","warn","Le PDF ne contient que des images","Un bulletin issu d'un logiciel de paie contient du texte sélectionnable. Ici il a été scanné, photographié ou converti. Demandez l'original.");
-    if(EDITORS.test(sw)) add("fichier","warn","Passé par un outil de retouche",`Le fichier indique « ${esc(sw)} ». Ces outils servent à modifier un PDF. Cela peut être innocent (fusion, masquage), mais demandez l'original.`);
-    else if(OFFICE.test(sw)&&!PAYROLL.test(sw)) add("fichier","warn","Créé avec un traitement de texte",`« ${esc(sw)} ». Les logiciels de paie n'utilisent pas Word ou Writer. Courant pour un faux fait maison.`);
-    else if(EXCEL.test(sw)&&!PAYROLL.test(sw)) add("fichier","info","Créé depuis un tableur",`« ${esc(sw)} ». Possible dans une très petite entreprise, mais facile à modifier.`);
-    else if(PAYROLL.test(sw)) add("fichier","ok","Produit par un logiciel de paie",`« ${esc(sw)} »`);
-    else if(sw) add("fichier","info","Logiciel d'origine",`« ${esc(sw)} ». Technologie générique : normal pour un bulletin téléchargé sur un portail RH.`);
-    else if(m.hasText) add("fichier","info","Logiciel d'origine non renseigné","Fréquent après un passage par un portail, un mail ou un outil de nettoyage.");
-    if(m.signed) add("fichier","ok","Signature électronique présente","Le fichier porte une signature numérique : bon signe d'un coffre-fort ou portail RH.");
-    if(m.created&&m.modified&&(m.modified-m.created)/1000>120){
-      const j=(m.modified-m.created)/86400000;
-      add("fichier",j>1&&EDITORS.test(sw)?"warn":"info","Réenregistré après sa création",`Créé le ${fdate(m.created)}, modifié le ${fdate(m.modified)}. Normal pour un portail ou un coffre-fort ; à surveiller si le reste cloche.`);
-    }
-    if(m.saves>2) add("fichier","info","Plusieurs versions empilées",`${m.saves} enregistrements successifs dans le fichier. Peut venir d'une signature ou d'un simple réenregistrement.`);
-  }
-
-  /* --- Numéros --- */
-  const ss=siretState(f.siret);
-  if(ss==="ok") add("numeros","ok","SIRET valide",`<span class="num">${esc(f.siret.replace(/(\d{3})(\d{3})(\d{3})(\d{5})/,"$1 $2 $3 $4"))}</span> · <a href="https://annuaire-entreprises.data.gouv.fr/etablissement/${esc(f.siret)}" target="_blank" rel="noopener">voir l'entreprise →</a>`);
-  else if(ss==="bad") add("numeros","bad","SIRET impossible",`<span class="num">${esc(f.siret)}</span> ne respecte pas la clé de contrôle. Soit il est inventé, soit il a été mal recopié : vérifiez-le sur le bulletin.`);
-  else if(ss==="format") add("numeros","warn","SIRET incomplet",`« ${esc(f.siret)} » n'a pas 14 chiffres.`);
-  else add("numeros","info","SIRET non trouvé","Il est obligatoire sur un bulletin. Recopiez-le ci-dessus pour le contrôler.");
-  const ns=nirState(f.nir);
-  if(ns==="bad") add("numeros","bad","Numéro de sécurité sociale impossible","Sa clé (les 2 derniers chiffres) est fausse. Un numéro inventé a cette erreur ; un vrai, jamais.");
-  else if(ns==="ok") add("numeros","ok","Numéro de sécurité sociale cohérent","La clé de contrôle est juste.");
-  else if(ns==="masked") add("numeros","info","Numéro de sécurité sociale masqué","Le candidat a le droit de le masquer.");
-
-  /* --- Calculs --- */
-  const brut=parseAmt(f.brut), nAP=parseAmt(f.netAPayer), nAI=parseAmt(f.netAvantImpot), nImp=parseAmt(f.netImposable), pas=parseAmt(f.pas), cum=parseAmt(f.cumulBrut);
-  let netRef=nAI, refLabel="net avant impôt";
-  if(netRef==null&&nAP!=null&&pas!=null){netRef=nAP+pas;refLabel="net à payer + impôt";}
-  if(netRef==null&&nAP!=null){netRef=nAP;refLabel="net à payer";}
-  if(brut!=null&&netRef!=null&&brut>0){
-    const r=netRef/brut;
-    if(r>1.0) add("calculs","bad","Le net dépasse le brut",`${eur(netRef)} net pour ${eur(brut)} brut. Impossible, sauf remboursement exceptionnel : vérifiez d'abord que les deux montants sont bien lus.`);
-    else if(r>0.86) add("calculs","warn","Très peu de cotisations",`Le ${refLabel} fait ${pct(r)} du brut. Un salarié du privé est en général entre 75 et 82 %. Possible pour un apprenti ou certains contrats aidés.`);
-    else if(r<(nAI==null&&pas==null?0.58:0.66)) add("calculs","warn","Beaucoup de retenues",`Le ${refLabel} ne fait que ${pct(r)} du brut. Saisie sur salaire, acompte, mutuelle chère… ou montant mal lu.`);
-    else add("calculs","ok","Rapport net / brut normal",`${pct(r)} du brut (${refLabel} ${eur(netRef)} pour ${eur(brut)} brut).`);
-  } else add("calculs","info","Brut ou net manquant","Renseignez au moins le salaire brut et le net à payer pour vérifier les calculs.");
-  if(nAI!=null&&pas!=null&&nAP!=null){
-    const gap=Math.abs(nAI-pas-nAP);
-    if(gap>1.01) add("calculs","bad","Le net à payer ne tombe pas juste",`${eur(nAI)} − ${eur(pas)} d'impôt devrait donner ${eur(nAI-pas)}. Le bulletin indique ${eur(nAP)} (écart de ${eur(gap)}). Un logiciel de paie ne fait pas cette erreur.`);
-    else add("calculs","ok","Impôt correctement déduit",`${eur(nAI)} − ${eur(pas)} = ${eur(nAP)}.`);
-  }
-  if(nImp!=null&&(nAI??nAP)!=null){
-    const base=nAI??nAP; const r=nImp/base;
-    if(r<0.95||r>1.2) add("calculs","warn","Net imposable étonnant",`${eur(nImp)} imposable pour ${eur(base)} net. D'habitude le net imposable dépasse le net de 2 à 6 %.`);
-    else add("calculs","ok","Net imposable cohérent",`${pct(r-1>0?r-1:0)} au-dessus du net, comme attendu.`);
-  }
-  if(pas!=null&&nImp){const t=pas/nImp; if(t>0.45) add("calculs","warn","Taux d'impôt improbable",`${pct(t)} du net imposable prélevé à la source.`);}
-  if(f.periode){
-    const [y,mo]=f.periode.split("-").map(Number);
-    const months=(new Date().getFullYear()-y)*12+(new Date().getMonth()+1-mo);
-    if(months<0) add("calculs","bad","Mois dans le futur",`Bulletin de ${moisLabel(f.periode)}, alors que nous sommes avant.`);
-    else if(months>4) add("calculs","info","Bulletin ancien",`${moisLabel(f.periode)}. Demandez les 3 derniers mois.`);
-    if(cum!=null&&brut!=null){
-      if(cum+1<brut) add("calculs","bad","Cumul annuel inférieur au mois",`Le cumul depuis janvier (${eur(cum)}) ne peut pas être inférieur au brut du mois (${eur(brut)}).`);
-      else if(cum>brut*mo*1.8+1) add("calculs","warn","Cumul annuel trop élevé",`${eur(cum)} après ${mo} mois, soit bien plus que ${mo} × ${eur(brut)}. Prime exceptionnelle, ou chiffre inventé.`);
-      else add("calculs","ok","Cumul annuel plausible",`${eur(cum)} depuis janvier pour ${eur(brut)} ce mois-ci.`);
-    }
-  }
-  const round=[brut,nAP].filter(v=>v!=null&&v>=500&&v%100===0);
-  if(round.length&&brut!=null&&nAP!=null) add("calculs","info","Montant rond",`${round.map(eur).join(" et ")}. Rare après calcul des cotisations, pas impossible.`);
-  return F;
-}
-function verdictOf(F){
-  const all=[...F.fichier,...F.calculs,...F.numeros];
-  const bad=all.filter(x=>x.sev==="bad").length;
-  const warnHard=[...F.calculs,...F.numeros].filter(x=>x.sev==="warn").length;
-  const warnFile=F.fichier.filter(x=>x.sev==="warn").length;
-  if(bad>=1)return "bad";
-  if(warnHard>=1||warnFile>=1)return "warn";
-  return "ok";
+</script>
+<script>
+(function(){
+"use strict";
+const {esc,eur,moisLabel,parseAmt,analyze,verdictOf,cross,readPdf}=window.VB;
+const $=s=>document.querySelector(s);
+const fdate=d=>d?d.toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})+" à "+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"—";
+if(window.pdfjsLib && !window.pdfjsWorker){
+  try{pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob(['importScripts("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js")'],{type:"text/javascript"}));}catch(e){}
 }
 const LV={
   ok:{pill:"Cohérent",glyph:"✓",title:"Rien d'anormal dans ce dossier",todo:"Faites quand même les vérifications humaines ci-dessous : l'outil ne prouve pas qu'un bulletin est vrai, il repère ceux qui sont mal faits."},
@@ -410,41 +589,11 @@ const LV={
   bad:{pill:"Incohérent",glyph:"✕",title:"Ce dossier contient des incohérences",todo:"Vérifiez d'abord que les valeurs lues sont les bonnes (corrigez-les si besoin). Si l'incohérence reste, ne validez pas sans une pièce officielle supplémentaire : avis d'imposition vérifié sur impots.gouv, contrat de travail, appel à l'employeur."},
   na:{pill:"Incomplet",glyph:"?",title:"Pas assez d'informations",todo:"Renseignez au moins le salaire brut, le net à payer et le SIRET."}
 };
-
-/* ---------- Recoupements entre bulletins ---------- */
-function cross(list){
-  const out=[]; const add=(sev,t,d)=>out.push({sev,t,d});
-  const sirets=[...new Set(list.map(b=>(b.fields.siret||"").replace(/\D/g,"")).filter(s=>s.length===14))];
-  if(sirets.length>1) add("warn","SIRET différents d'un bulletin à l'autre",`${sirets.map(s=>`<span class="num">${s}</span>`).join(" et ")}. Un même employeur garde le même numéro, sauf changement d'établissement.`);
-  const dated=list.filter(b=>b.fields.periode).sort((a,b)=>a.fields.periode.localeCompare(b.fields.periode));
-  for(let i=1;i<dated.length;i++){
-    const A=dated[i-1],B=dated[i];
-    const [ya,ma]=A.fields.periode.split("-").map(Number),[yb,mb]=B.fields.periode.split("-").map(Number);
-    if(A.fields.periode===B.fields.periode){add("warn","Deux bulletins pour le même mois",`${esc(A.name)} et ${esc(B.name)} : ${moisLabel(A.fields.periode)}.`);continue;}
-    const cA=parseAmt(A.fields.cumulBrut),cB=parseAmt(B.fields.cumulBrut),bB=parseAmt(B.fields.brut),bA=parseAmt(A.fields.brut);
-    if(ya===yb&&mb===ma+1&&cA!=null&&cB!=null&&bB!=null){
-      const exp=cA+bB;
-      if(Math.abs(exp-cB)>1.01) add("bad","Les cumuls ne s'enchaînent pas",`Cumul de ${moisLabel(A.fields.periode)} : ${eur(cA)}. Avec ${eur(bB)} de brut en ${moisLabel(B.fields.periode)}, on attend ${eur(exp)} ; le bulletin indique ${eur(cB)}. C'est l'erreur typique d'un bulletin modifié sans refaire les cumuls.`);
-      else add("ok","Les cumuls s'enchaînent bien",`${moisLabel(A.fields.periode)} → ${moisLabel(B.fields.periode)}.`);
-    }
-    if(bA&&bB){const v=Math.abs(bB-bA)/bA; if(v>0.3) add("info","Le brut varie beaucoup",`${eur(bA)} puis ${eur(bB)} (${pct(v)}). Prime ou heures supplémentaires possibles.`);}
-  }
-  const avis=parseAmt($("#avis").value);
-  const imps=list.map(b=>parseAmt(b.fields.netImposable)).filter(v=>v!=null);
-  if(avis&&imps.length){
-    const annual=imps.reduce((a,v)=>a+v,0)/imps.length*12; const r=annual/avis;
-    if(r>1.35) add("warn","Bulletins bien au-dessus de l'avis d'imposition",`Environ ${eur(annual)} par an d'après les bulletins, contre ${eur(avis)} déclarés. Augmentation possible, à justifier (contrat, avenant).`);
-    else if(r<0.7) add("warn","Bulletins bien en dessous de l'avis",`Environ ${eur(annual)} par an contre ${eur(avis)} déclarés.`);
-    else add("ok","Revenus cohérents avec l'avis d'imposition",`Environ ${eur(annual)} par an contre ${eur(avis)} déclarés.`);
-  }
-  return out;
-}
-
-/* ---------- État et rendu ---------- */
 let bulletins=[]; let uid=0; let example=true;
 const FIELDS=[
-  ["periode","Mois","month"],["brut","Salaire brut","amt"],["netAvantImpot","Net avant impôt","amt"],["pas","Impôt prélevé","amt"],
-  ["netAPayer","Net à payer","amt"],["netImposable","Net imposable","amt"],["cumulBrut","Cumul brut annuel","amt"],
+  ["periode","Mois","month"],["brut","Salaire brut","amt"],["cotSal","Total cotisations salariales","amt"],["netAvantImpot","Net avant impôt","amt"],
+  ["pas","Impôt prélevé","amt"],["netAPayer","Net à payer","amt"],["netImposable","Net imposable","amt"],["cumulBrut","Cumul brut annuel","amt"],
+  ["tauxHoraire","Taux horaire","amt"],["heures","Heures du mois","amt"],["salaireBase","Salaire de base","amt"],
   ["siret","SIRET employeur","text"],["nir","N° sécurité sociale","text"]];
 const fmtField=(k,v)=>v==null?"":(typeof v==="number"?v.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/ /g," "):v);
 const GLYPH={bad:"✕",warn:"!",info:"i",ok:"✓"};
@@ -464,6 +613,7 @@ function cardResult(b){
   const pill=$(`#pill-${b.id}`); pill.className="pill lv-"+b._lv; pill.textContent=LV[b._lv].pill;
   $(`#g-fichier-${b.id}`).innerHTML=groupHTML(F.fichier,"Rien à signaler.");
   $(`#g-calculs-${b.id}`).innerHTML=groupHTML(F.calculs,"Renseignez les montants pour lancer les calculs.");
+  $(`#g-lignes-${b.id}`).innerHTML=groupHTML(F.lignes,"Disponible uniquement pour un PDF dont le tableau a pu être lu.");
   $(`#g-numeros-${b.id}`).innerHTML=groupHTML(F.numeros,"Aucun numéro trouvé.");
   const hasCalcIssue=F.calculs.some(x=>x.sev==="bad"||x.sev==="warn");
   const hint=$(`#vh-${b.id}`);
@@ -473,13 +623,14 @@ function cardResult(b){
 function renderCard(b){
   const m=b.meta;
   const sub=b.source==="exemple"?"Exemple fictif":b.source==="image"?"Photo ou scan":b.source==="manuel"?"Saisie manuelle":b.source==="locked"?"PDF protégé":`PDF · ${m.pages} page${m.pages>1?"s":""}`;
-  const fileDl=m?`<details class="more"><summary>Détails techniques du fichier</summary><dl class="file"><dt>Logiciel</dt><dd>${esc(m.producer||"—")}${m.creator&&m.creator!==m.producer?" / "+esc(m.creator):""}</dd><dt>Créé le</dt><dd>${fdate(m.created)}</dd><dt>Modifié le</dt><dd>${fdate(m.modified)}</dd><dt>Enregistrements</dt><dd class="num">${m.saves}</dd><dt>Polices</dt><dd>${m.fonts.length?esc(m.fonts.join(", ")):"—"}</dd></dl></details>`:"";
+  const fileDl=m?`<details class="more"><summary>Détails techniques du fichier</summary><dl class="file"><dt>Logiciel</dt><dd>${esc([m.producer,m.creator,m.author].filter(Boolean).join(" · ")||"—")}</dd><dt>Créé le</dt><dd>${fdate(m.created)}</dd><dt>Modifié le</dt><dd>${fdate(m.modified)}</dd><dt>Enregistrements</dt><dd class="num">${m.saves}</dd><dt>Polices</dt><dd>${m.fonts&&m.fonts.length?esc(m.fonts.join(", ")):"—"}</dd></dl></details>`:"";
   const el=document.createElement("article");
   el.className="card"; el.id="card-"+b.id;
   el.innerHTML=`<div class="card-h"><div><h3>${esc(b.name)}</h3><p class="sub">${sub}${b.fields.periode?" · "+moisLabel(b.fields.periode):""}</p></div><div class="right"><span class="pill" id="pill-${b.id}"></span><button class="x" type="button" aria-label="Retirer ce bulletin" data-rm="${b.id}">×</button></div></div>
   <div class="sect"><div class="sect-h"><h3>Valeurs du bulletin</h3></div><p class="hint" id="vh-${b.id}"></p>
     <div class="vals">${FIELDS.map(([k,l,t])=>`<label class="v" for="f-${b.id}-${k}">${l}<input id="f-${b.id}-${k}" data-b="${b.id}" data-k="${k}" type="${t==="month"?"month":"text"}" ${t==="amt"?'inputmode="decimal" placeholder="0,00"':'placeholder="—"'} value="${esc(fmtField(k,b.fields[k]))}" autocomplete="off"></label>`).join("")}</div></div>
   <div class="sect"><div class="sect-h"><h3>Les calculs</h3></div><div id="g-calculs-${b.id}"></div></div>
+  <div class="sect"><div class="sect-h"><h3>Ligne par ligne</h3></div><div id="g-lignes-${b.id}"></div></div>
   <div class="sect"><div class="sect-h"><h3>Les numéros officiels</h3></div><div id="g-numeros-${b.id}"></div></div>
   <div class="sect"><div class="sect-h"><h3>Le fichier</h3></div><div id="g-fichier-${b.id}"></div>${fileDl}</div>`;
   return el;
@@ -492,8 +643,8 @@ function renderAll(){
 }
 function renderSummary(){
   const v=$("#verdict");
-  if(!bulletins.length){v.className="verdict";v.innerHTML=`<div class="head"><span class="glyph">?</span><h2>Aucun bulletin déposé</h2></div><p class="muted">Déposez les 3 derniers bulletins du candidat : l'outil vérifie aussi que les cumuls s'enchaînent d'un mois à l'autre.</p>`;return;}
-  const cr=cross(bulletins);
+  if(!bulletins.length){v.className="verdict";v.innerHTML=`<div class="head"><span class="glyph">?</span><h2>Aucun bulletin déposé</h2></div><p class="muted">Déposez les 3 derniers bulletins du candidat : l'outil compare aussi les mois entre eux (cumuls, primes nouvelles).</p>`;return;}
+  const cr=cross(bulletins,parseAmt($("#avis").value));
   const lvs=bulletins.map(b=>b._lv);
   let lv=lvs.includes("bad")||cr.some(x=>x.sev==="bad")?"bad":lvs.includes("warn")||cr.some(x=>x.sev==="warn")?"warn":lvs.every(l=>l==="na")?"na":"ok";
   const n=bulletins.length; const L=LV[lv];
@@ -502,21 +653,28 @@ function renderSummary(){
   <p class="todo"><b>Que faire :</b> ${L.todo}</p>
   ${cr.length?`<div><p class="hint" style="margin-bottom:6px">Entre les bulletins</p>${groupHTML(cr,"")}</div>`:""}`;
 }
-
-/* ---------- Exemple ---------- */
+/* Exemple fictif : les lignes du tableau permettent le contrôle ligne par ligne */
+function rows(spec,brutIdx,cotIdx){return spec.map(([label,tk,i])=>({i,label,tk,line:label,gain:i<brutIdx,total:false,skip:false}));}
 function loadExample(){
   example=true;
+  const R1=rows([["SALAIRE DE BASE",[151.67,16.78,2545.02],1],["PRIME D'ANCIENNETE",[2545.02,4.125,104.98],2],
+    ["MALADIE",[2650,0,0,184.18],5],["VIEILLESSE PLAFONNEE",[2650,6.9,182.85,226.58],6],["VIEILLESSE DEPLAFONNEE",[2650,0.4,10.6,53.53],7],
+    ["RETRAITE COMPLEMENTAIRE T1",[2650,4.01,106.27,159.27],8],["PREVOYANCE",[2650,0.6,15.9,26.5],9],["MUTUELLE",[1,28.5,28.5,28.5],10],
+    ["CSG DEDUCTIBLE",[2631.63,6.8,178.95],11],["CSG/CRDS NON DEDUCTIBLE",[2631.63,2.9,76.32],12]],3,14);
+  const R2=rows([["SALAIRE DE BASE",[151.67,16.78,2545.02],1],["PRIME EXCEPTIONNELLE",[1,655,655],2],
+    ["MALADIE",[3200,0,0,222.4],5],["VIEILLESSE PLAFONNEE",[3200,6.9,160.8,273.6],6],["VIEILLESSE DEPLAFONNEE",[3200,0.4,12.8,64.64],7],
+    ["RETRAITE COMPLEMENTAIRE T1",[3200,4.01,128.32,192.32],8],["PREVOYANCE",[3200,0.6,19.2,32],9],["MUTUELLE",[1,28.5,28.5,28.5],10],
+    ["CSG DEDUCTIBLE",[3176.5,6.8,216,0],11],["CSG/CRDS NON DEDUCTIBLE",[3176.5,2.9,92.12],12]],3,14);
   bulletins=[
     {id:++uid,name:"Exemple_bulletin_septembre.pdf",source:"exemple",
-     meta:{pages:1,hasText:true,producer:"Silae",creator:"Silae Paie",created:new Date(2026,9,2,9,14),modified:new Date(2026,9,2,9,14),saves:1,fonts:["Arial","Arial-Bold"],signed:false},
-     fields:{periode:"2026-09",siret:"81234560100023",brut:2650,netAvantImpot:2068.33,pas:93.07,netAPayer:1975.26,netImposable:2131.88,cumulBrut:23850,nir:"1 85 03 75 123 456 41",ape:true,ccn:true}},
+     meta:{pages:1,hasText:true,producer:"Silae",creator:"Silae Paie",author:"",created:new Date(2026,9,2,9,14),modified:new Date(2026,9,2,9,14),saves:1,fonts:["Arial","Arial-Bold"],signed:false},
+     fields:{periode:"2026-09",siret:"81234560100023",brut:2650,cotSal:599.39,netAvantImpot:2050.61,pas:92.28,netAPayer:1958.33,netImposable:2155.43,cumulBrut:23850,tauxHoraire:16.78,heures:151.67,salaireBase:2545.02,nir:"1 85 03 75 123 456 41",_rows:R1,_brutIdx:3,_cotIdx:14,_implied:false}},
     {id:++uid,name:"Exemple_bulletin_octobre.pdf",source:"exemple",
-     meta:{pages:1,hasText:true,producer:"iLovePDF",creator:"Microsoft Word",created:new Date(2026,10,1,8,40),modified:new Date(2026,10,6,22,17),saves:3,fonts:["Arial","Arial-Bold","Helvetica"],signed:false},
-     fields:{periode:"2026-10",siret:"81234560100025",brut:3200,netAvantImpot:2750,pas:0,netAPayer:2750,netImposable:2810,cumulBrut:27400,nir:"1 85 03 75 123 456 41",ape:true,ccn:true}}
+     meta:{pages:1,hasText:true,producer:"iLovePDF",creator:"Microsoft Word",author:"",created:new Date(2026,10,1,8,40),modified:new Date(2026,10,6,22,17),saves:3,fonts:["Arial","Arial-Bold","Helvetica"],signed:false},
+     fields:{periode:"2026-10",siret:"81234560100025",brut:3200,cotSal:657.74,netAvantImpot:2750,pas:0,netAPayer:2750,netImposable:2810,cumulBrut:27400,tauxHoraire:16.78,heures:151.67,salaireBase:2545.02,nir:"1 85 03 75 123 456 41",_rows:R2,_brutIdx:3,_cotIdx:14,_implied:false}}
   ];
   renderAll();
 }
-
 /* ---------- Événements ---------- */
 const status=t=>$("#status").textContent=t;
 function clearExample(){if(example){example=false;bulletins=[];}}
@@ -528,7 +686,7 @@ async function handleFiles(files){
     const b={id:++uid,name:file.name,meta:null,fields:{}};
     if(file.type.startsWith("image/")){b.source="image";}
     else{
-      try{const r=await readPdf(file);b.source="pdf";b.meta=r.meta;b.fields=r.fields;}
+      try{const r=await readPdf(file,window.pdfjsLib);b.source="pdf";b.meta=r.meta;b.fields=r.fields;}
       catch(e){b.source=(e&&e.name==="PasswordException")?"locked":"manuel";if(b.source==="manuel")b.name+=" (illisible)";}
     }
     bulletins.push(b);
@@ -555,7 +713,6 @@ $("#list").addEventListener("click",e=>{
   renderAll();
 });
 $("#avis").addEventListener("input",renderSummary);
-
 if(!window.pdfjsLib) status("Le lecteur PDF n'a pas pu se charger. Rechargez la page, ou saisissez à la main.");
 loadExample();
 })();
