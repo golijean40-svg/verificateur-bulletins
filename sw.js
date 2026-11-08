@@ -1,6 +1,6 @@
 // Service worker — Vérificateur de bulletins
 // Incrémentez VERSION à chaque mise à jour du site pour forcer le rafraîchissement du cache.
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE = "bulletins-" + VERSION;
 const SHELL = [
   "./", "./index.html",
@@ -28,3 +28,4 @@ self.addEventListener("fetch", e => {
   e.respondWith(fetch(req).then(res => { if (res.ok) caches.open(CACHE).then(c => c.put(req, res.clone())); return res; })
     .catch(() => caches.match(req).then(hit => hit || caches.match("./index.html"))));
 });
+u
